@@ -56,6 +56,24 @@ th{background:var(--border);}
 .subtabs button{background:var(--card);border:1px solid var(--border);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;}
 .subtabs button.active{background:var(--pink);color:#fff;border-color:var(--pink);}
 .note{font-size:12px;color:var(--muted);margin-top:10px;}
+.breadcrumb{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.detail-gallery{display:flex;gap:8px;margin-bottom:10px;}
+.thumbs{display:flex;flex-direction:column;gap:6px;}
+.thumbs img{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer;}
+.mainimg{flex:1;width:100%;max-height:240px;object-fit:cover;border-radius:12px;cursor:zoom-in;}
+.oldprice{text-decoration:line-through;color:var(--muted);font-size:14px;margin-left:6px;}
+.qtyrow{display:flex;align-items:center;gap:10px;margin:10px 0;}
+.qtybox{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
+.btn2col{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+.btn2col a,.btn2col button{display:block;text-align:center;text-decoration:none;padding:11px;border-radius:9px;font-weight:700;font-size:13px;border:none;cursor:pointer;}
+.bt-cart{background:var(--pink);color:#fff;}
+.bt-order{background:#222;color:#fff;}
+.bt-call{background:#222;color:#fff;}
+.bt-wa{background:#25D366;color:#fff;}
+.sharegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0;}
+.sharegrid button{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 4px;font-size:11px;cursor:pointer;}
+.features-list{margin:8px 0;padding-left:18px;font-size:13px;}
+.features-list li{margin-bottom:3px;}
 </style>
 </head>
 <body>
@@ -81,6 +99,9 @@ th{background:var(--border);}
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
+
+// ⚠️ এখানে আপনার বিজনেসের আসল ফোন/হোয়াটসঅ্যাপ নম্বর বসান (দেশের কোড সহ, + ছাড়া)
+const BUSINESS_PHONE = "8801XXXXXXXXX";
 
 let products = [];
 let orders = [];
@@ -151,22 +172,54 @@ function renderStore(){
 }
 function setFilterCat(c){ filterCat=c; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
-function addToCart(id){ cart[id]=(cart[id]||0)+1; updateCartCount(); }
+function addToCart(id, qty){ qty = qty||1; cart[id]=(cart[id]||0)+qty; updateCartCount(); }
 function updateCartCount(){ document.getElementById('cartCount').textContent = Object.values(cart).reduce((a,b)=>a+b,0); }
 function showProductDetail(id){
   const p = products.find(x=>x.id===id); if(!p) return;
   const out = p.stock<=0;
-  const media = p.imageUrl
-    ? `<img src="${p.imageUrl}" alt="${p.name}" onclick="openImageZoom('${p.imageUrl}')" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:10px;cursor:zoom-in;">`
-    : `<div class="emoji" style="font-size:80px;">${p.emoji||'👶'}</div>`;
+  const allImages = [p.imageUrl, ...((p.extraImages||'').split(',').map(s=>s.trim()).filter(Boolean))].filter(Boolean);
+  detailQty = 1;
+  const gallery = allImages.length ? `<div class="detail-gallery">
+      ${allImages.length>1?`<div class="thumbs">${allImages.map(u=>`<img src="${u}" onclick="document.getElementById('mainDetailImg').src='${u}'">`).join('')}</div>`:''}
+      <img id="mainDetailImg" class="mainimg" src="${allImages[0]}" onclick="openImageZoom(this.src)">
+    </div>` : `<div class="emoji" style="font-size:80px;">${p.emoji||'👶'}</div>`;
+  const featuresHtml = p.features ? `<div><b>Key Features:</b><ul class="features-list">${p.features.split('\n').filter(Boolean).map(f=>`<li>${f}</li>`).join('')}</ul></div>` : '';
   showSheet(`<button class="close" onclick="closeSheet()">✕</button>
-    ${media}
+    <div class="breadcrumb">Home / Shop${p.category?' / '+p.category:''}</div>
+    ${gallery}
     <h2 style="margin:4px 0">${p.name}</h2>
-    <div class="pstock" style="margin-bottom:6px">${p.category||''}${p.subcategory?' · '+p.subcategory:''}${p.ageGroup?' · '+p.ageGroup:''}</div>
-    <div class="pprice" style="font-size:20px">৳${p.price}</div>
-    <div class="pstock ${p.stock<=5?'low':''}" style="margin-bottom:14px">${out?'স্টকে নেই':'স্টক আছে: '+p.stock+' পিস'}</div>
-    <button class="buy" ${out?'disabled':''} onclick="addToCart('${p.id}');closeSheet();openCart();">${out?'Out of stock':'🛒 কার্টে যোগ করুন'}</button>
-    ${p.imageUrl?'<p class="note">ছবিতে ট্যাপ করলে বড় করে দেখা যাবে</p>':''}`);
+    <div class="pstock" style="margin-bottom:4px">${p.category||''}${p.subcategory?' · '+p.subcategory:''}${p.ageGroup?' · '+p.ageGroup:''}</div>
+    <div class="pprice" style="font-size:20px">৳${p.price}${p.originalPrice&&p.originalPrice>p.price?`<span class="oldprice">৳${p.originalPrice}</span>`:''}</div>
+    <div class="pstock ${p.stock<=5?'low':''}">${out?'স্টকে নেই':'স্টক আছে: '+p.stock+' পিস'}</div>
+    <div class="qtyrow"><div class="qtybox">
+      <button class="qtybtn" onclick="changeDetailQty(-1)">−</button><span id="detailQtyVal">1</span><button class="qtybtn" onclick="changeDetailQty(1)">+</button>
+    </div></div>
+    <div class="btn2col">
+      <button class="bt-cart" ${out?'disabled':''} onclick="addToCart('${p.id}',detailQty);closeSheet();openCart();">🛒 Add to Cart</button>
+      <button class="bt-order" ${out?'disabled':''} onclick="addToCart('${p.id}',detailQty);closeSheet();openCheckout();">Order Now</button>
+      <a class="bt-call" href="tel:+${BUSINESS_PHONE}">📞 Call For Order</a>
+      <a class="bt-wa" target="_blank" href="https://wa.me/${BUSINESS_PHONE}?text=${encodeURIComponent('আমি এই প্রোডাক্টটি অর্ডার করতে চাই: '+p.name+' - ৳'+p.price)}">💬 Order On WhatsApp</a>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Share this product:</div>
+    <div class="sharegrid">
+      <button onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href))">Facebook</button>
+      <button onclick="shareGeneric('${p.name.replace(/'/g,"")}')">Messenger</button>
+      <button onclick="window.open('https://wa.me/?text='+encodeURIComponent(p.name+' - ৳'+p.price+' '+location.href))">WhatsApp</button>
+      <button onclick="copyProductLink()">Copy Link</button>
+    </div>
+    ${featuresHtml}`);
+}
+let detailQty = 1;
+function changeDetailQty(d){
+  detailQty = Math.max(1, detailQty+d);
+  const el = document.getElementById('detailQtyVal'); if(el) el.textContent = detailQty;
+}
+function shareGeneric(name){
+  if(navigator.share){ navigator.share({title:name, url:location.href}); }
+  else { copyProductLink(); }
+}
+function copyProductLink(){
+  navigator.clipboard.writeText(location.href).then(()=>alert('লিংক কপি হয়েছে!'));
 }
 function openImageZoom(url){
   let ov = document.createElement('div');
@@ -283,34 +336,42 @@ function renderAdminBody(){
 }
 async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
 function editProduct(id){
-  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:''};
+  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
     <label>নাম</label><input id="pName" value="${p.name}">
     <label>Image URL</label>
     <a href="https://postimages.org" target="_blank" class="secondary" style="display:inline-block;text-decoration:none;padding:8px 12px;font-size:13px;margin-bottom:8px;">📤 postimages.org খুলুন (ছবি আপলোড করে "Direct link" কপি করুন)</a>
     <input id="pImg" value="${p.imageUrl||''}" placeholder="এখানে Direct link পেস্ট করুন">
+    <label>আরও ছবি (গ্যালারি, একাধিক হলে কমা দিয়ে আলাদা করুন — ঐচ্ছিক)</label><input id="pExtraImg" value="${p.extraImages||''}" placeholder="url1, url2, url3">
     <label>ইমোজি/আইকন (ছবি না থাকলে এটা দেখাবে)</label><input id="pEmoji" value="${p.emoji}">
     <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
+    <label>আগের দাম (ঐচ্ছিক — ডিসকাউন্ট দেখাতে চাইলে)</label><input id="pOldPrice" type="number" value="${p.originalPrice||''}">
     <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
     <label>Main Category</label>
     <select id="pCat">${CATEGORIES.map(c=>`<option ${p.category===c?'selected':''}>${c}</option>`).join('')}</select>
     <label>Sub-category (যেমন: Frock, Romper, T-Shirt)</label><input id="pSubcat" value="${p.subcategory||''}">
     <label>Age/Size</label>
     <select id="pAge"><option value="">— নির্বাচন করুন —</option>${AGE_GROUPS.map(a=>`<option ${p.ageGroup===a?'selected':''}>${a}</option>`).join('')}</select>
+    <label>Key Features (প্রতি লাইনে একটা ফিচার লিখুন)</label>
+    <textarea id="pFeatures" rows="4" placeholder="100% Cotton\nSoft & breathable\nMachine washable">${p.features||''}</textarea>
     <button class="primary" style="width:100%" onclick="saveProduct('${id||''}')">সেভ করুন</button>`);
 }
 async function saveProduct(id){
   const name=document.getElementById('pName').value.trim();
   const imageUrl=document.getElementById('pImg').value.trim();
+  const extraImages=document.getElementById('pExtraImg').value.trim();
   const emoji=document.getElementById('pEmoji').value.trim()||'👶';
   const price=parseFloat(document.getElementById('pPrice').value)||0;
+  const originalPrice=parseFloat(document.getElementById('pOldPrice').value)||0;
   const stock=parseInt(document.getElementById('pStock').value)||0;
   const category=document.getElementById('pCat').value;
   const subcategory=document.getElementById('pSubcat').value.trim();
   const ageGroup=document.getElementById('pAge').value;
+  const features=document.getElementById('pFeatures').value.trim();
   if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
-  if(id){ await db.collection('products').doc(id).update({name,emoji,price,stock,category,subcategory,ageGroup,imageUrl}); }
-  else{ await db.collection('products').add({name,emoji,price,stock,category,subcategory,ageGroup,imageUrl}); }
+  const data = {name,emoji,price,originalPrice,stock,category,subcategory,ageGroup,imageUrl,extraImages,features};
+  if(id){ await db.collection('products').doc(id).update(data); }
+  else{ await db.collection('products').add(data); }
   closeSheet();
 }
 async function deleteProduct(id){
