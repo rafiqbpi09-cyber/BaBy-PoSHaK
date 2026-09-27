@@ -21,6 +21,14 @@ header h1{margin:0;font-size:20px;cursor:pointer;}
 .navicon{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px;color:#fff;position:relative;}
 .navicon span.ic{font-size:18px;}
 .navbadge{position:absolute;top:-6px;right:-10px;background:#fff;color:var(--pink-dark);border-radius:10px;font-size:10px;font-weight:800;padding:1px 5px;}
+.categorynav{display:flex;gap:0;overflow-x:auto;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:62px;z-index:9;padding:0 8px;}
+.navitem{position:relative;flex-shrink:0;}
+.navitem>span{display:block;padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.navitem>span:hover{color:var(--pink-dark);}
+.megapanel{display:none;position:absolute;top:100%;left:0;background:var(--card);border:1px solid var(--border);border-radius:0 0 10px 10px;box-shadow:var(--shadow);min-width:220px;max-height:280px;overflow-y:auto;z-index:15;padding:6px 0;}
+.megapanel.open{display:block;}
+.megapanel div{padding:8px 16px;font-size:13px;cursor:pointer;}
+.megapanel div:hover{background:var(--border);}
 .tabbtn{background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;}
 .tabbtn.active{background:#fff;color:var(--pink-dark);font-weight:600;}
 main{max-width:900px;margin:0 auto;padding:16px;padding-bottom:90px;}
@@ -121,6 +129,7 @@ th{background:var(--border);}
     <div class="navicon" onclick="openCart()"><span class="ic">🛍</span><small>Bag</small><span class="navbadge" id="cartCount2">0</span></div>
   </div>
 </header>
+<nav class="categorynav" id="categoryNav"></nav>
 <main>
   <div id="storeView"></div>
   <div id="adminView" class="hidden"></div>
@@ -149,6 +158,7 @@ let isAdmin = false;
 let filterCat = 'All';
 let filterAge = 'All';
 let filterSize = 'All';
+let filterSubcat = 'All';
 let searchQuery = '';
 let wishlist = load('bp_wishlist', []);
 
@@ -159,6 +169,20 @@ const CATEGORIES = [
 ];
 const AGE_GROUPS = ['0-3M','3-6M','6-12M','1-2Y','2-3Y','3-4Y','4-5Y','5-6Y','6-7Y','7-9Y','9-11Y'];
 const SIZES = ['0','1','2','3','4','5','6','7','8','10','12'];
+const SUBCATS = {
+  'Newborn Collection': ['Newborn Romper','Newborn Bodysuit','Sleepsuit','Baby Frock','Baby Shirt','Baby Pant','Baby Set','Swaddle','Newborn Cap','Mitten & Socks Set'],
+  'Baby Boy': ['T-Shirt','Polo Shirt','Shirt','Denim Shirt','Shorts','Long Pant','Jogger Pant','Cargo Pant','Panjabi','Kurta','Waistcoat',"Boy's Dress Set","Boy's Party Dress"],
+  'Baby Girl': ['Frock','Gown','Top','T-Shirt','Skirt','Leggings','Palazzo','Salwar Kameez','Kurti',"Girl's Dress Set",'Party Dress','Princess Dress'],
+  'Romper & Bodysuit': ['Half Sleeve Romper','Full Sleeve Romper','Sleeveless Romper','Cotton Romper','Printed Romper','Cartoon Romper','Bodysuit','Sleepsuit','Footed Romper'],
+  'Baby Nightwear': ['Night Suit','Pajama Set','Sleepsuit','Night Frock','Cotton Night Dress','Winter Night Suit'],
+  'Summer Collection': ['Cotton T-Shirt','Cotton Frock','Sleeveless Dress','Shorts','Cotton Set','Light Romper','Summer Pajama'],
+  'Winter Collection': ['Baby Jacket','Hoodie','Sweater','Cardigan','Winter Frock','Winter Pant','Winter Set','Thermal Wear','Baby Blanket'],
+  'Party & Occasion': ['Birthday Dress','Party Frock','Princess Dress','Wedding Dress','Eid Dress','Puja/Traditional Dress','Ceremony Dress','Designer Baby Dress'],
+  'Traditional Collection': ['Baby Panjabi','Baby Kurta','Panjabi Pajama Set',"Boy's Eid Set","Girl's Salwar Kameez","Girl's Kurti",'Traditional Frock'],
+  'Baby Gift Set': ['Newborn Gift Box','Baby Dress Set','Romper Gift Set','Boy Gift Set','Girl Gift Set','Birthday Gift Set','Baby Accessories Gift Set'],
+  'Baby Accessories': ['Baby Cap','Baby Socks','Baby Mittens','Baby Bib','Baby Shoes','Hair Band','Hair Clip','Headband','Baby Gloves','Baby Towel'],
+  'Matching Collection': ['Mother & Daughter','Father & Son','Brother & Sister','Family Matching','Couple & Baby Matching']
+};
 const SIZE_CHART = [
   ['0','0–3 মাস','50–60 cm','16–18"'],['1','3–6 মাস','60–68 cm','17–19"'],['2','6–12 মাস','68–76 cm','18–20"'],
   ['3','1–2 বছর','76–86 cm','19–21"'],['4','2–3 বছর','86–96 cm','20–22"'],['5','3–4 বছর','96–104 cm','21–23"'],
@@ -204,7 +228,11 @@ function getFilteredProducts(){
   } else {
     base = products;
   }
-  return base.filter(p=>(filterAge==='All'||p.ageGroup===filterAge)&&(filterSize==='All'||p.size===filterSize));
+  return base.filter(p=>
+    (filterAge==='All'||p.ageGroup===filterAge) &&
+    (filterSize==='All'||p.size===filterSize) &&
+    (filterSubcat==='All' || (p.subcategory||'').toLowerCase().includes(filterSubcat.toLowerCase()))
+  );
 }
 function renderStore(){
   const el = document.getElementById('storeView');
@@ -237,6 +265,7 @@ function renderStore(){
       </div>
       <div class="storecontent">
         <div class="searchbar"><span>🔍</span><input id="searchBox" value="${searchQuery}" placeholder="Search a product" oninput="setSearchQuery(this.value)"></div>
+        ${filterSubcat!=='All'?`<div class="note" style="margin-bottom:10px">Sub-category: <b>${filterSubcat}</b> <span style="cursor:pointer;color:var(--pink-dark)" onclick="clearSubcat()">✕ clear</span></div>`:''}
         <div class="quickpills">
           <div class="qpill qp-blue ${filterCat==='Newborn Collection'?'active':''}" onclick="setFilterCat('Newborn Collection')">👶 Newborn</div>
           <div class="qpill qp-pink ${filterCat==='Baby Girl'?'active':''}" onclick="setFilterCat('Baby Girl')">👧 Girl</div>
@@ -273,10 +302,33 @@ function renderProductGrid(){
   updateCartCount();
 }
 function toggleSidebar(){ document.getElementById('sidebarPanel').classList.toggle('open'); }
+function buildCategoryNav(){
+  const nav = document.getElementById('categoryNav');
+  nav.innerHTML = CATEGORIES.map((c,i)=>`<div class="navitem">
+      <span onclick="toggleMegaMenu(${i})">${c}</span>
+      <div class="megapanel" id="mega-${i}">
+        ${(SUBCATS[c]||[]).map(s=>`<div onclick="goToSubcat('${c}',\`${s.replace(/`/g,'')}\`)">${s}</div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function toggleMegaMenu(i){
+  document.querySelectorAll('.megapanel').forEach((el,idx)=>{ if(idx!==i) el.classList.remove('open'); });
+  document.getElementById('mega-'+i).classList.toggle('open');
+}
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.navitem')) document.querySelectorAll('.megapanel').forEach(el=>el.classList.remove('open'));
+});
+function goToSubcat(cat, sub){
+  filterCat = cat; filterSubcat = sub; searchQuery='';
+  document.querySelectorAll('.megapanel').forEach(el=>el.classList.remove('open'));
+  showView('store');
+}
+buildCategoryNav();
 function setSearchQuery(v){ searchQuery=v; renderProductGrid(); }
-function setFilterCat(c){ filterCat=c; renderStore(); }
+function setFilterCat(c){ filterCat=c; filterSubcat='All'; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
 function setFilterSize(s){ filterSize=s; renderStore(); }
+function clearSubcat(){ filterSubcat='All'; renderStore(); }
 function addToCart(id, qty){ qty = qty||1; cart[id]=(cart[id]||0)+qty; updateCartCount(); }
 function updateCartCount(){
   const c = Object.values(cart).reduce((a,b)=>a+b,0);
