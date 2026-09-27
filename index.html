@@ -15,8 +15,12 @@
 }
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
-header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--pink),var(--pink-dark));color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);}
-header h1{margin:0;font-size:20px;}
+header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--pink),var(--pink-dark));color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);flex-wrap:wrap;gap:10px;}
+header h1{margin:0;font-size:20px;cursor:pointer;}
+.navicons{display:flex;gap:18px;align-items:center;}
+.navicon{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px;color:#fff;position:relative;}
+.navicon span.ic{font-size:18px;}
+.navbadge{position:absolute;top:-6px;right:-10px;background:#fff;color:var(--pink-dark);border-radius:10px;font-size:10px;font-weight:800;padding:1px 5px;}
 .tabbtn{background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;}
 .tabbtn.active{background:#fff;color:var(--pink-dark);font-weight:600;}
 main{max-width:900px;margin:0 auto;padding:16px;padding-bottom:90px;}
@@ -109,10 +113,12 @@ th{background:var(--border);}
 </head>
 <body>
 <header>
-  <h1>👶 Baby Poshak</h1>
-  <div>
-    <button class="tabbtn active" id="btnStore" onclick="showView('store')">শপ</button>
-    <button class="tabbtn" id="btnAdmin" onclick="showView('admin')">Admin</button>
+  <h1 onclick="showView('store')">👶 Baby Poshak</h1>
+  <div class="navicons">
+    <div class="navicon" onclick="showStores()"><span class="ic">📍</span><small>Stores</small></div>
+    <div class="navicon" onclick="showView('admin')"><span class="ic">👤</span><small>Profile</small></div>
+    <div class="navicon" onclick="openWishlist()"><span class="ic">♡</span><small>Wishlist</small><span class="navbadge" id="wishCount">0</span></div>
+    <div class="navicon" onclick="openCart()"><span class="ic">🛍</span><small>Bag</small><span class="navbadge" id="cartCount2">0</span></div>
   </div>
 </header>
 <main>
@@ -133,6 +139,8 @@ const auth = firebase.auth();
 
 // ⚠️ এখানে আপনার বিজনেসের আসল ফোন/হোয়াটসঅ্যাপ নম্বর বসান (দেশের কোড সহ, + ছাড়া)
 const BUSINESS_PHONE = "8801712863183";
+function load(key,def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def; }catch(e){ return def; } }
+function save(key,val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
 
 let products = [];
 let orders = [];
@@ -142,6 +150,7 @@ let filterCat = 'All';
 let filterAge = 'All';
 let filterSize = 'All';
 let searchQuery = '';
+let wishlist = load('bp_wishlist', []);
 
 const CATEGORIES = [
   'Newborn Collection','Baby Boy','Baby Girl','Romper & Bodysuit',
@@ -174,8 +183,6 @@ auth.onAuthStateChanged(u=>{ isAdmin = !!u; renderAdmin(); });
 function showView(v){
   document.getElementById('storeView').classList.toggle('hidden', v!=='store');
   document.getElementById('adminView').classList.toggle('hidden', v!=='admin');
-  document.getElementById('btnStore').classList.toggle('active', v==='store');
-  document.getElementById('btnAdmin').classList.toggle('active', v==='admin');
   document.getElementById('cartFab').classList.toggle('hidden', v!=='store');
   if(v==='store') renderStore(); else renderAdmin();
 }
@@ -253,7 +260,8 @@ function renderProductGrid(){
   filtered.forEach(p=>{
     const low = p.stock<=5, out = p.stock<=0;
     const media = p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.name}" style="width:100%;height:110px;object-fit:cover;border-radius:10px;margin-bottom:6px;">` : `<div class="emoji">${p.emoji||'👶'}</div>`;
-    grid.innerHTML += `<div class="card" onclick="showProductDetail('${p.id}')" style="cursor:pointer;">
+    grid.innerHTML += `<div class="card" onclick="showProductDetail('${p.id}')" style="cursor:pointer;position:relative;">
+      <button onclick="event.stopPropagation();toggleWishlist('${p.id}')" style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.85);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;">${wishlist.includes(p.id)?'❤️':'🤍'}</button>
       ${media}
       <div class="pname">${p.name}</div>
       <div class="pstock">${p.category||''}${p.ageGroup?' · '+p.ageGroup:''}${p.size?' · Size '+p.size:''}</div>
@@ -270,7 +278,32 @@ function setFilterCat(c){ filterCat=c; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
 function setFilterSize(s){ filterSize=s; renderStore(); }
 function addToCart(id, qty){ qty = qty||1; cart[id]=(cart[id]||0)+qty; updateCartCount(); }
-function updateCartCount(){ document.getElementById('cartCount').textContent = Object.values(cart).reduce((a,b)=>a+b,0); }
+function updateCartCount(){
+  const c = Object.values(cart).reduce((a,b)=>a+b,0);
+  document.getElementById('cartCount').textContent = c;
+  const c2 = document.getElementById('cartCount2'); if(c2) c2.textContent = c;
+  const wc = document.getElementById('wishCount'); if(wc) wc.textContent = wishlist.length;
+}
+function toggleWishlist(id){
+  if(wishlist.includes(id)) wishlist = wishlist.filter(x=>x!==id);
+  else wishlist.push(id);
+  save('bp_wishlist', wishlist);
+  updateCartCount();
+  renderProductGrid();
+}
+function openWishlist(){
+  const items = products.filter(p=>wishlist.includes(p.id));
+  const rows = items.length ? items.map(p=>`<div class="cartrow">
+      <div>${p.emoji} ${p.name}<br><small>৳${p.price}</small></div>
+      <div><button class="smallbtn edit" onclick="closeSheet();showProductDetail('${p.id}')">দেখুন</button><button class="smallbtn del" onclick="toggleWishlist('${p.id}');openWishlist()">✕</button></div>
+    </div>`).join('') : '<p>আপনার Wishlist এ কিছু নেই।</p>';
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>♡ Wishlist</h2>${rows}`);
+}
+function showStores(){
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>📍 Store Info</h2>
+    <p><b>Baby Poshak</b><br>ঢাকা, বাংলাদেশ<br>📞 <a href="tel:+${BUSINESS_PHONE}">${BUSINESS_PHONE}</a></p>
+    <p class="note">সঠিক ঠিকানা এখনো যোগ করা হয়নি — কোডে BUSINESS_PHONE এর কাছেই একটা ঠিকানা লিখে দিতে বলুন।</p>`);
+}
 function showProductDetail(id){
   const p = products.find(x=>x.id===id); if(!p) return;
   const out = p.stock<=0;
