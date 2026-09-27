@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baby Poshak</title>
+<style>
+:root{
+  --pink:#ff8fab; --pink-dark:#e85d8a; --cream:#fff8f2; --card:#ffffff;
+  --text:#3a2e2e; --muted:#8a7b7b; --border:#f0dfe3; --accent:#7fd8be;
+  --bg:var(--cream); --shadow:0 4px 14px rgba(232,93,138,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#221a1d; --card:#2e2427; --text:#f5e9ea; --muted:#b39a9a; --border:#4a3a3d; }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
+header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--pink),var(--pink-dark));color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);}
+header h1{margin:0;font-size:20px;}
+.tabbtn{background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;}
+.tabbtn.active{background:#fff;color:var(--pink-dark);font-weight:600;}
+main{max-width:900px;margin:0 auto;padding:16px;padding-bottom:90px;}
+.hidden{display:none !important;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+.card{background:var(--card);border-radius:16px;padding:14px;box-shadow:var(--shadow);border:1px solid var(--border);}
+.emoji{font-size:40px;text-align:center;margin-bottom:6px;}
+.pname{font-weight:600;font-size:15px;margin:4px 0 2px;}
+.pprice{color:var(--pink-dark);font-weight:700;}
+.pstock{font-size:12px;color:var(--muted);}
+.pstock.low{color:#d9534f;font-weight:600;}
+button.buy{width:100%;margin-top:8px;background:var(--pink);color:#fff;border:none;padding:9px;border-radius:10px;font-weight:600;cursor:pointer;}
+button.buy:disabled{background:#ccc;cursor:not-allowed;}
+.cartfab{position:fixed;bottom:20px;right:20px;background:var(--pink-dark);color:#fff;border:none;border-radius:50px;padding:14px 20px;font-weight:700;box-shadow:var(--shadow);cursor:pointer;z-index:20;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:var(--card);width:100%;max-width:500px;border-radius:20px 20px 0 0;padding:20px;max-height:85vh;overflow-y:auto;position:relative;}
+.cartrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.qtybtn{background:var(--border);border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-weight:700;}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;margin:6px 0 12px;background:var(--card);color:var(--text);font-size:14px;}
+label{font-size:13px;color:var(--muted);}
+.total{font-size:18px;font-weight:700;margin:10px 0;}
+.primary{background:var(--pink-dark);color:#fff;border:none;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;}
+.secondary{background:var(--border);color:var(--text);border:none;padding:12px;border-radius:10px;font-weight:600;cursor:pointer;}
+.close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:12px;overflow:hidden;}
+th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--border);}
+th{background:var(--border);}
+.smallbtn{padding:5px 9px;border-radius:6px;border:none;font-size:12px;cursor:pointer;margin-right:4px;}
+.edit{background:var(--accent);color:#083b2c;}
+.del{background:#d9534f;color:#fff;}
+.overflow-x{overflow-x:auto;}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px;}
+.stat{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);text-align:center;}
+.statnum{font-size:24px;font-weight:800;color:var(--pink-dark);}
+.statlabel{font-size:12px;color:var(--muted);}
+.subtabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.subtabs button{background:var(--card);border:1px solid var(--border);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;}
+.subtabs button.active{background:var(--pink);color:#fff;border-color:var(--pink);}
+.note{font-size:12px;color:var(--muted);margin-top:10px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>👶 Baby Poshak</h1>
+  <div>
+    <button class="tabbtn active" id="btnStore" onclick="showView('store')">শপ</button>
+    <button class="tabbtn" id="btnAdmin" onclick="showView('admin')">Admin</button>
+  </div>
+</header>
+<main>
+  <div id="storeView"></div>
+  <div id="adminView" class="hidden"></div>
+</main>
+<button class="cartfab hidden" id="cartFab" onclick="openCart()">🛒 <span id="cartCount">0</span></button>
+
+<!-- Firebase (compat SDK, works with plain script tags) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let products = [];
+let orders = [];
+let cart = {};
+let isAdmin = false;
+
+db.collection('products').onSnapshot(snap=>{
+  products = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  if(!document.getElementById('storeView').classList.contains('hidden')) renderStore();
+  if(isAdmin && adminTab==='products') renderAdminBody();
+});
+db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap=>{
+  orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  if(isAdmin && (adminTab==='orders'||adminTab==='analytics')) renderAdminBody();
+});
+auth.onAuthStateChanged(u=>{ isAdmin = !!u; renderAdmin(); });
+
+function showView(v){
+  document.getElementById('storeView').classList.toggle('hidden', v!=='store');
+  document.getElementById('adminView').classList.toggle('hidden', v!=='admin');
+  document.getElementById('btnStore').classList.toggle('active', v==='store');
+  document.getElementById('btnAdmin').classList.toggle('active', v==='admin');
+  document.getElementById('cartFab').classList.toggle('hidden', v!=='store');
+  if(v==='store') renderStore(); else renderAdmin();
+}
+
+// ---------- STORE ----------
+function renderStore(){
+  const el = document.getElementById('storeView');
+  el.innerHTML = `<div class="grid" id="prodGrid"></div>`;
+  const grid = document.getElementById('prodGrid');
+  products.forEach(p=>{
+    const low = p.stock<=5, out = p.stock<=0;
+    grid.innerHTML += `<div class="card">
+      <div class="emoji">${p.emoji||'👶'}</div>
+      <div class="pname">${p.name}</div>
+      <div class="pprice">৳${p.price}</div>
+      <div class="pstock ${low?'low':''}">${out?'স্টকে নেই':'স্টক: '+p.stock}</div>
+      <button class="buy" ${out?'disabled':''} onclick="addToCart('${p.id}')">${out?'Out of stock':'কার্টে যোগ করুন'}</button>
+    </div>`;
+  });
+  updateCartCount();
+}
+function addToCart(id){ cart[id]=(cart[id]||0)+1; updateCartCount(); }
+function updateCartCount(){ document.getElementById('cartCount').textContent = Object.values(cart).reduce((a,b)=>a+b,0); }
+function openCart(){
+  const items = Object.entries(cart).filter(([id,q])=>q>0).map(([id,q])=>{ const p=products.find(x=>x.id===id); return p?{...p,qty:q}:null; }).filter(Boolean);
+  const total = items.reduce((s,i)=>s+i.price*i.qty,0);
+  let rows = items.length ? items.map(i=>`<div class="cartrow"><div>${i.emoji} ${i.name}<br><small>৳${i.price} × ${i.qty}</small></div>
+    <div><button class="qtybtn" onclick="changeQty('${i.id}',-1)">−</button> <button class="qtybtn" onclick="changeQty('${i.id}',1)">+</button></div></div>`).join('') : '<p>কার্ট খালি।</p>';
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🛒 আপনার কার্ট</h2>${rows}
+    <div class="total">মোট: ৳${total}</div>
+    ${items.length? `<button class="primary" style="width:100%" onclick="openCheckout()">চেকআউট করুন</button>` : ''}`);
+}
+function changeQty(id,d){ cart[id]=Math.max(0,(cart[id]||0)+d); if(cart[id]===0) delete cart[id]; updateCartCount(); openCart(); }
+function openCheckout(){
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>অর্ডার তথ্য দিন</h2>
+    <label>আপনার নাম</label><input id="cName">
+    <label>মোবাইল নম্বর</label><input id="cPhone" placeholder="01XXXXXXXXX">
+    <label>ঠিকানা</label><textarea id="cAddr" rows="2"></textarea>
+    <label>পেমেন্ট মেথড</label><select id="cPay"><option>bKash</option><option>Nagad</option><option>Cash on Delivery</option></select>
+    <button class="primary" style="width:100%" onclick="placeOrder()">✅ অর্ডার কনফার্ম করুন</button>`);
+}
+async function placeOrder(){
+  const name=document.getElementById('cName').value.trim();
+  const phone=document.getElementById('cPhone').value.trim();
+  const addr=document.getElementById('cAddr').value.trim();
+  const pay=document.getElementById('cPay').value;
+  if(!name||!phone){ alert('নাম ও মোবাইল নম্বর দিন'); return; }
+  const items = Object.entries(cart).filter(([id,q])=>q>0).map(([id,q])=>{ const p=products.find(x=>x.id===id); return {id,name:p.name,price:p.price,qty:q}; });
+  if(!items.length){ alert('কার্ট খালি'); return; }
+  const total = items.reduce((s,i)=>s+i.price*i.qty,0);
+  await db.collection('orders').add({ name, phone, addr, pay, items, total, status:'Pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  for(const it of items){
+    const p = products.find(x=>x.id===it.id);
+    if(p) await db.collection('products').doc(it.id).update({ stock: Math.max(0,p.stock-it.qty) });
+  }
+  const msg = encodeURIComponent(`নতুন অর্ডার - Baby Poshak\nনাম: ${name}\nমোবাইল: ${phone}\nঠিকানা: ${addr}\nপেমেন্ট: ${pay}\n${items.map(i=>`- ${i.name} x${i.qty} = ৳${i.price*i.qty}`).join('\n')}\nমোট: ৳${total}`);
+  cart={}; updateCartCount();
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🎉 অর্ডার সফল হয়েছে!</h2><p>মোট: <b>৳${total}</b></p>
+    <a class="primary" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px" href="https://wa.me/?text=${msg}" target="_blank">📲 WhatsApp এ পাঠান</a>
+    <button class="secondary" style="width:100%" onclick="closeSheet();">ঠিক আছে</button>`);
+}
+function showSheet(html){
+  let ov = document.getElementById('sheetOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='sheetOverlay'; ov.className='overlay'; document.body.appendChild(ov); }
+  ov.innerHTML = `<div class="sheet">${html}</div>`;
+  ov.onclick=(e)=>{ if(e.target===ov) closeSheet(); };
+}
+function closeSheet(){ const ov=document.getElementById('sheetOverlay'); if(ov) ov.remove(); }
+
+// ---------- ADMIN ----------
+let adminTab='products';
+function renderAdmin(){
+  const el = document.getElementById('adminView');
+  if(!isAdmin){
+    el.innerHTML = `<div class="card" style="max-width:340px;margin:30px auto;">
+      <h3>Admin লগইন</h3>
+      <label>ইমেইল</label><input id="aEmail" type="email">
+      <label>পাসওয়ার্ড</label><input id="aPass" type="password">
+      <button class="primary" style="width:100%" onclick="adminLogin()">লগইন</button>
+      <p class="note">Firebase Console → Authentication এ আপনার admin ইমেইল/পাসওয়ার্ড আগে থেকে তৈরি করে নিন।</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div style="text-align:right;margin-bottom:8px"><button class="secondary" onclick="auth.signOut()">লগআউট</button></div>
+    <div class="subtabs">
+      <button class="${adminTab==='products'?'active':''}" onclick="setAdminTab('products')">📦 প্রোডাক্ট</button>
+      <button class="${adminTab==='orders'?'active':''}" onclick="setAdminTab('orders')">🧾 অর্ডার</button>
+      <button class="${adminTab==='analytics'?'active':''}" onclick="setAdminTab('analytics')">📊 রিপোর্ট</button>
+    </div>
+    <div id="adminBody"></div>`;
+  renderAdminBody();
+}
+async function adminLogin(){
+  const email=document.getElementById('aEmail').value.trim();
+  const pass=document.getElementById('aPass').value;
+  try{ await auth.signInWithEmailAndPassword(email,pass); }
+  catch(e){ alert('লগইন ব্যর্থ: '+e.message); }
+}
+function setAdminTab(t){ adminTab=t; renderAdminBody(); document.querySelectorAll('.subtabs button').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); }
+function renderAdminBody(){
+  const body = document.getElementById('adminBody'); if(!body) return;
+  if(adminTab==='products'){
+    body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
+    <div class="overflow-x"><table><tr><th>প্রোডাক্ট</th><th>দাম</th><th>স্টক</th><th></th></tr>
+    ${products.map(p=>`<tr><td>${p.emoji} ${p.name}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
+      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
+    </table></div>`;
+  } else if(adminTab==='orders'){
+    body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>নাম</th><th>মোবাইল</th><th>মোট</th><th>পেমেন্ট</th><th>স্ট্যাটাস</th></tr>
+    ${orders.map(o=>`<tr><td>${o.name}</td><td>${o.phone}</td><td>৳${o.total}</td><td>${o.pay}</td>
+      <td><select onchange="updateStatus('${o.id}',this.value)">${['Pending','Confirmed','Shipped','Delivered'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}
+    </table></div>` : '<p>এখনো কোনো অর্ডার নেই।</p>';
+  } else if(adminTab==='analytics'){
+    const totalSales = orders.reduce((s,o)=>s+o.total,0);
+    const lowStock = products.filter(p=>p.stock<=5).length;
+    const salesByProduct={};
+    orders.forEach(o=>o.items.forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+i.qty; }));
+    const top = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    body.innerHTML = `<div class="statgrid">
+        <div class="stat"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
+        <div class="stat"><div class="statnum">${orders.length}</div><div class="statlabel">মোট অর্ডার</div></div>
+        <div class="stat"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
+      </div>
+      <h3>টপ সেলিং প্রোডাক্ট</h3>
+      ${top.length? '<ol>'+top.map(([n,q])=>`<li>${n} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
+  }
+}
+async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
+function editProduct(id){
+  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:''};
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
+    <label>নাম</label><input id="pName" value="${p.name}">
+    <label>ইমোজি/আইকন</label><input id="pEmoji" value="${p.emoji}">
+    <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
+    <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
+    <label>ক্যাটাগরি</label><input id="pCat" value="${p.category||''}">
+    <button class="primary" style="width:100%" onclick="saveProduct('${id||''}')">সেভ করুন</button>`);
+}
+async function saveProduct(id){
+  const name=document.getElementById('pName').value.trim();
+  const emoji=document.getElementById('pEmoji').value.trim()||'👶';
+  const price=parseFloat(document.getElementById('pPrice').value)||0;
+  const stock=parseInt(document.getElementById('pStock').value)||0;
+  const category=document.getElementById('pCat').value.trim();
+  if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
+  if(id){ await db.collection('products').doc(id).update({name,emoji,price,stock,category}); }
+  else{ await db.collection('products').add({name,emoji,price,stock,category}); }
+  closeSheet();
+}
+async function deleteProduct(id){
+  if(!confirm('এই প্রোডাক্টটি ডিলিট করবেন?')) return;
+  await db.collection('products').doc(id).delete();
+}
+
+showView('store');
+</script>
+</body>
+</html>
