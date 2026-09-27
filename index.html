@@ -137,8 +137,9 @@ function renderStore(){
   if(!filtered.length){ grid.innerHTML = '<p>এই ফিল্টারে কোনো প্রোডাক্ট নেই।</p>'; }
   filtered.forEach(p=>{
     const low = p.stock<=5, out = p.stock<=0;
+    const media = p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.name}" style="width:100%;height:110px;object-fit:cover;border-radius:10px;margin-bottom:6px;">` : `<div class="emoji">${p.emoji||'👶'}</div>`;
     grid.innerHTML += `<div class="card">
-      <div class="emoji">${p.emoji||'👶'}</div>
+      ${media}
       <div class="pname">${p.name}</div>
       <div class="pstock">${p.category||''}${p.ageGroup?' · '+p.ageGroup:''}</div>
       <div class="pprice">৳${p.price}</div>
@@ -232,8 +233,8 @@ function renderAdminBody(){
   const body = document.getElementById('adminBody'); if(!body) return;
   if(adminTab==='products'){
     body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
-    <div class="overflow-x"><table><tr><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
-    ${products.map(p=>`<tr><td>${p.emoji} ${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
+    <div class="overflow-x"><table><tr><th>ছবি</th><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
+    ${products.map(p=>`<tr><td>${p.imageUrl?`<img src="${p.imageUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">`:p.emoji}</td><td>${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
       <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
     </table></div>`;
   } else if(adminTab==='orders'){
@@ -258,10 +259,11 @@ function renderAdminBody(){
 }
 async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
 function editProduct(id){
-  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:'',subcategory:'',ageGroup:''};
+  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
     <label>নাম</label><input id="pName" value="${p.name}">
-    <label>ইমোজি/আইকন</label><input id="pEmoji" value="${p.emoji}">
+    <label>Image URL (imgbb.com/postimages.org এ আপলোড করে লিংক পেস্ট করুন)</label><input id="pImg" value="${p.imageUrl||''}" placeholder="https://...">
+    <label>ইমোজি/আইকন (ছবি না থাকলে এটা দেখাবে)</label><input id="pEmoji" value="${p.emoji}">
     <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
     <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
     <label>Main Category</label>
@@ -273,6 +275,7 @@ function editProduct(id){
 }
 async function saveProduct(id){
   const name=document.getElementById('pName').value.trim();
+  const imageUrl=document.getElementById('pImg').value.trim();
   const emoji=document.getElementById('pEmoji').value.trim()||'👶';
   const price=parseFloat(document.getElementById('pPrice').value)||0;
   const stock=parseInt(document.getElementById('pStock').value)||0;
@@ -280,8 +283,8 @@ async function saveProduct(id){
   const subcategory=document.getElementById('pSubcat').value.trim();
   const ageGroup=document.getElementById('pAge').value;
   if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
-  if(id){ await db.collection('products').doc(id).update({name,emoji,price,stock,category,subcategory,ageGroup}); }
-  else{ await db.collection('products').add({name,emoji,price,stock,category,subcategory,ageGroup}); }
+  if(id){ await db.collection('products').doc(id).update({name,emoji,price,stock,category,subcategory,ageGroup,imageUrl}); }
+  else{ await db.collection('products').add({name,emoji,price,stock,category,subcategory,ageGroup,imageUrl}); }
   closeSheet();
 }
 async function deleteProduct(id){
