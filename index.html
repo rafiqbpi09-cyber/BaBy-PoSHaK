@@ -86,6 +86,15 @@ let products = [];
 let orders = [];
 let cart = {};
 let isAdmin = false;
+let filterCat = 'All';
+let filterAge = 'All';
+
+const CATEGORIES = [
+  'Newborn Collection','Baby Boy','Baby Girl','Romper & Bodysuit',
+  'Baby Nightwear','Summer Collection','Winter Collection','Party & Occasion',
+  'Traditional Collection','Baby Gift Set','Baby Accessories','Matching Collection'
+];
+const AGE_GROUPS = ['0-3M','3-6M','6-12M','1-2Y','2-3Y','3-4Y','4-5Y','5-7Y','7-9Y','9-12Y'];
 
 db.collection('products').onSnapshot(snap=>{
   products = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -110,13 +119,28 @@ function showView(v){
 // ---------- STORE ----------
 function renderStore(){
   const el = document.getElementById('storeView');
-  el.innerHTML = `<div class="grid" id="prodGrid"></div>`;
+  el.innerHTML = `
+    <div class="subtabs" id="catFilter">
+      <button class="${filterCat==='All'?'active':''}" onclick="setFilterCat('All')">সব</button>
+      ${CATEGORIES.map(c=>`<button class="${filterCat===c?'active':''}" onclick="setFilterCat('${c}')">${c}</button>`).join('')}
+    </div>
+    <select id="ageFilterSel" style="max-width:220px" onchange="setFilterAge(this.value)">
+      <option value="All" ${filterAge==='All'?'selected':''}>সব বয়স/সাইজ</option>
+      ${AGE_GROUPS.map(a=>`<option value="${a}" ${filterAge===a?'selected':''}>${a}</option>`).join('')}
+    </select>
+    <div class="grid" id="prodGrid"></div>`;
   const grid = document.getElementById('prodGrid');
-  products.forEach(p=>{
+  const filtered = products.filter(p=>
+    (filterCat==='All' || p.category===filterCat) &&
+    (filterAge==='All' || p.ageGroup===filterAge)
+  );
+  if(!filtered.length){ grid.innerHTML = '<p>এই ফিল্টারে কোনো প্রোডাক্ট নেই।</p>'; }
+  filtered.forEach(p=>{
     const low = p.stock<=5, out = p.stock<=0;
     grid.innerHTML += `<div class="card">
       <div class="emoji">${p.emoji||'👶'}</div>
       <div class="pname">${p.name}</div>
+      <div class="pstock">${p.category||''}${p.ageGroup?' · '+p.ageGroup:''}</div>
       <div class="pprice">৳${p.price}</div>
       <div class="pstock ${low?'low':''}">${out?'স্টকে নেই':'স্টক: '+p.stock}</div>
       <button class="buy" ${out?'disabled':''} onclick="addToCart('${p.id}')">${out?'Out of stock':'কার্টে যোগ করুন'}</button>
@@ -124,6 +148,8 @@ function renderStore(){
   });
   updateCartCount();
 }
+function setFilterCat(c){ filterCat=c; renderStore(); }
+function setFilterAge(a){ filterAge=a; renderStore(); }
 function addToCart(id){ cart[id]=(cart[id]||0)+1; updateCartCount(); }
 function updateCartCount(){ document.getElementById('cartCount').textContent = Object.values(cart).reduce((a,b)=>a+b,0); }
 function openCart(){
@@ -206,8 +232,8 @@ function renderAdminBody(){
   const body = document.getElementById('adminBody'); if(!body) return;
   if(adminTab==='products'){
     body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
-    <div class="overflow-x"><table><tr><th>প্রোডাক্ট</th><th>দাম</th><th>স্টক</th><th></th></tr>
-    ${products.map(p=>`<tr><td>${p.emoji} ${p.name}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
+    <div class="overflow-x"><table><tr><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
+    ${products.map(p=>`<tr><td>${p.emoji} ${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
       <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
     </table></div>`;
   } else if(adminTab==='orders'){
@@ -232,13 +258,17 @@ function renderAdminBody(){
 }
 async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
 function editProduct(id){
-  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:''};
+  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:'',subcategory:'',ageGroup:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
     <label>নাম</label><input id="pName" value="${p.name}">
     <label>ইমোজি/আইকন</label><input id="pEmoji" value="${p.emoji}">
     <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
     <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
-    <label>ক্যাটাগরি</label><input id="pCat" value="${p.category||''}">
+    <label>Main Category</label>
+    <select id="pCat">${CATEGORIES.map(c=>`<option ${p.category===c?'selected':''}>${c}</option>`).join('')}</select>
+    <label>Sub-category (যেমন: Frock, Romper, T-Shirt)</label><input id="pSubcat" value="${p.subcategory||''}">
+    <label>Age/Size</label>
+    <select id="pAge"><option value="">— নির্বাচন করুন —</option>${AGE_GROUPS.map(a=>`<option ${p.ageGroup===a?'selected':''}>${a}</option>`).join('')}</select>
     <button class="primary" style="width:100%" onclick="saveProduct('${id||''}')">সেভ করুন</button>`);
 }
 async function saveProduct(id){
@@ -246,10 +276,12 @@ async function saveProduct(id){
   const emoji=document.getElementById('pEmoji').value.trim()||'👶';
   const price=parseFloat(document.getElementById('pPrice').value)||0;
   const stock=parseInt(document.getElementById('pStock').value)||0;
-  const category=document.getElementById('pCat').value.trim();
+  const category=document.getElementById('pCat').value;
+  const subcategory=document.getElementById('pSubcat').value.trim();
+  const ageGroup=document.getElementById('pAge').value;
   if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
-  if(id){ await db.collection('products').doc(id).update({name,emoji,price,stock,category}); }
-  else{ await db.collection('products').add({name,emoji,price,stock,category}); }
+  if(id){ await db.collection('products').doc(id).update({name,emoji,price,stock,category,subcategory,ageGroup}); }
+  else{ await db.collection('products').add({name,emoji,price,stock,category,subcategory,ageGroup}); }
   closeSheet();
 }
 async function deleteProduct(id){
