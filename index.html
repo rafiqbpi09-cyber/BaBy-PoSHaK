@@ -262,7 +262,9 @@ function editProduct(id){
   const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
     <label>নাম</label><input id="pName" value="${p.name}">
-    <label>Image URL (imgbb.com/postimages.org এ আপলোড করে লিংক পেস্ট করুন)</label><input id="pImg" value="${p.imageUrl||''}" placeholder="https://...">
+    <label>Image URL</label>
+    <a href="https://postimages.org" target="_blank" class="secondary" style="display:inline-block;text-decoration:none;padding:8px 12px;font-size:13px;margin-bottom:8px;">📤 postimages.org খুলুন (ছবি আপলোড করে "Direct link" কপি করুন)</a>
+    <input id="pImg" value="${p.imageUrl||''}" placeholder="এখানে Direct link পেস্ট করুন">
     <label>ইমোজি/আইকন (ছবি না থাকলে এটা দেখাবে)</label><input id="pEmoji" value="${p.emoji}">
     <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
     <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
