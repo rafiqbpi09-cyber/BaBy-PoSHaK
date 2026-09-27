@@ -78,6 +78,23 @@ th{background:var(--border);}
 .sh-copy{background:#6c6c6c;}
 .features-list{margin:8px 0;padding-left:18px;font-size:13px;}
 .features-list li{margin-bottom:3px;}
+.storelayout{display:flex;gap:16px;align-items:flex-start;}
+.sidebar{width:220px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.sidebar h4{margin:14px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.sidebar h4:first-child{margin-top:0;}
+.sidebar-link{display:flex;justify-content:space-between;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;}
+.sidebar-link:hover{background:var(--border);}
+.sidebar-link.active{background:var(--pink);color:#fff;}
+.sidebar-link .cnt{color:var(--muted);font-size:11px;}
+.sidebar-link.active .cnt{color:#fff;}
+.storecontent{flex:1;min-width:0;}
+.mobile-filter-toggle{display:none;width:auto;margin-bottom:10px;}
+@media (max-width:700px){
+  .storelayout{flex-direction:column;}
+  .sidebar{width:100%;display:none;}
+  .sidebar.open{display:block;}
+  .mobile-filter-toggle{display:inline-block;}
+}
 </style>
 </head>
 <body>
@@ -130,7 +147,10 @@ const SIZE_CHART = [
 ];
 
 db.collection('products').onSnapshot(snap=>{
-  products = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  products = snap.docs.map(d=>{
+    const data = d.data();
+    return {id:d.id, ...data, createdAtMs: data.createdAt ? data.createdAt.toMillis() : 0};
+  });
   if(!document.getElementById('storeView').classList.contains('hidden')) renderStore();
   if(isAdmin && adminTab==='products') renderAdminBody();
 });
@@ -150,28 +170,59 @@ function showView(v){
 }
 
 // ---------- STORE ----------
+function getFilteredProducts(){
+  let base;
+  if(filterCat==='NewArrival'){
+    base = [...products].sort((a,b)=>(b.createdAtMs||0)-(a.createdAtMs||0)).slice(0,10);
+  } else if(filterCat==='TopSelling'){
+    const sales={}; orders.forEach(o=>o.items.forEach(i=>{ sales[i.id]=(sales[i.id]||0)+i.qty; }));
+    base = products.filter(p=>sales[p.id]).sort((a,b)=>(sales[b.id]||0)-(sales[a.id]||0));
+  } else if(filterCat==='MegaDeal'){
+    base = products.filter(p=>p.originalPrice && p.originalPrice>p.price && (p.originalPrice-p.price)/p.originalPrice>=0.2);
+  } else if(filterCat==='FreeDelivery'){
+    base = products.filter(p=>p.freeDelivery);
+  } else if(filterCat!=='All'){
+    base = products.filter(p=>p.category===filterCat);
+  } else {
+    base = products;
+  }
+  return base.filter(p=>(filterAge==='All'||p.ageGroup===filterAge)&&(filterSize==='All'||p.size===filterSize));
+}
 function renderStore(){
   const el = document.getElementById('storeView');
+  const catCount = c => products.filter(p=>p.category===c).length;
+  const sidebarLink = (key,label,cnt) => `<div class="sidebar-link ${filterCat===key?'active':''}" onclick="setFilterCat('${key}')">
+      <span>${label}</span>${cnt!=null?`<span class="cnt">${cnt}</span>`:''}
+    </div>`;
   el.innerHTML = `
-    <div class="subtabs" id="catFilter">
-      <button class="${filterCat==='All'?'active':''}" onclick="setFilterCat('All')">সব</button>
-      ${CATEGORIES.map(c=>`<button class="${filterCat===c?'active':''}" onclick="setFilterCat('${c}')">${c}</button>`).join('')}
-    </div>
-    <select id="ageFilterSel" style="max-width:220px;display:inline-block" onchange="setFilterAge(this.value)">
-      <option value="All" ${filterAge==='All'?'selected':''}>সব বয়স</option>
-      ${AGE_GROUPS.map(a=>`<option value="${a}" ${filterAge===a?'selected':''}>${a}</option>`).join('')}
-    </select>
-    <select id="sizeFilterSel" style="max-width:180px;display:inline-block" onchange="setFilterSize(this.value)">
-      <option value="All" ${filterSize==='All'?'selected':''}>সব সাইজ</option>
-      ${SIZES.map(s=>`<option value="${s}" ${filterSize===s?'selected':''}>Size ${s}</option>`).join('')}
-    </select>
-    <div class="grid" id="prodGrid"></div>`;
+    <button class="mobile-filter-toggle secondary" onclick="toggleSidebar()">☰ Filter</button>
+    <div class="storelayout">
+      <div class="sidebar" id="sidebarPanel">
+        <h4>Special Offers</h4>
+        ${sidebarLink('All','সব প্রোডাক্ট')}
+        ${sidebarLink('MegaDeal','🔥 Mega Deal')}
+        ${sidebarLink('NewArrival','🆕 New Arrival')}
+        ${sidebarLink('TopSelling','⭐ Top Selling')}
+        ${sidebarLink('FreeDelivery','🚚 Free Delivery')}
+        <h4>Category</h4>
+        ${CATEGORIES.map(c=>sidebarLink(c,c,catCount(c))).join('')}
+        <h4>Age</h4>
+        <select id="ageFilterSel" onchange="setFilterAge(this.value)">
+          <option value="All" ${filterAge==='All'?'selected':''}>সব বয়স</option>
+          ${AGE_GROUPS.map(a=>`<option value="${a}" ${filterAge===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+        <h4>Size</h4>
+        <select id="sizeFilterSel" onchange="setFilterSize(this.value)">
+          <option value="All" ${filterSize==='All'?'selected':''}>সব সাইজ</option>
+          ${SIZES.map(s=>`<option value="${s}" ${filterSize===s?'selected':''}>Size ${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="storecontent">
+        <div class="grid" id="prodGrid"></div>
+      </div>
+    </div>`;
   const grid = document.getElementById('prodGrid');
-  const filtered = products.filter(p=>
-    (filterCat==='All' || p.category===filterCat) &&
-    (filterAge==='All' || p.ageGroup===filterAge) &&
-    (filterSize==='All' || p.size===filterSize)
-  );
+  const filtered = getFilteredProducts();
   if(!filtered.length){ grid.innerHTML = '<p>এই ফিল্টারে কোনো প্রোডাক্ট নেই।</p>'; }
   filtered.forEach(p=>{
     const low = p.stock<=5, out = p.stock<=0;
@@ -187,6 +238,7 @@ function renderStore(){
   });
   updateCartCount();
 }
+function toggleSidebar(){ document.getElementById('sidebarPanel').classList.toggle('open'); }
 function setFilterCat(c){ filterCat=c; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
 function setFilterSize(s){ filterSize=s; renderStore(); }
@@ -381,6 +433,7 @@ function editProduct(id){
     </details>
     <label>Key Features (প্রতি লাইনে একটা ফিচার লিখুন)</label>
     <textarea id="pFeatures" rows="4" placeholder="100% Cotton\nSoft & breathable\nMachine washable">${p.features||''}</textarea>
+    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="pFreeDel" style="width:auto;margin:0;" ${p.freeDelivery?'checked':''}> Free Delivery</label>
     <button class="primary" style="width:100%" onclick="saveProduct('${id||''}')">সেভ করুন</button>`);
 }
 async function saveProduct(id){
@@ -396,10 +449,11 @@ async function saveProduct(id){
   const ageGroup=document.getElementById('pAge').value;
   const size=document.getElementById('pSize').value;
   const features=document.getElementById('pFeatures').value.trim();
+  const freeDelivery=document.getElementById('pFreeDel').checked;
   if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
-  const data = {name,emoji,price,originalPrice,stock,category,subcategory,ageGroup,size,imageUrl,extraImages,features};
+  const data = {name,emoji,price,originalPrice,stock,category,subcategory,ageGroup,size,imageUrl,extraImages,features,freeDelivery};
   if(id){ await db.collection('products').doc(id).update(data); }
-  else{ await db.collection('products').add(data); }
+  else{ data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection('products').add(data); }
   closeSheet();
 }
 async function deleteProduct(id){
