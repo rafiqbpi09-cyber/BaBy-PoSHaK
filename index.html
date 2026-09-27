@@ -88,6 +88,16 @@ th{background:var(--border);}
 .sidebar-link .cnt{color:var(--muted);font-size:11px;}
 .sidebar-link.active .cnt{color:#fff;}
 .storecontent{flex:1;min-width:0;}
+.searchbar{position:relative;margin-bottom:14px;}
+.searchbar input{padding:12px 12px 12px 38px;border-radius:10px;margin:0;}
+.searchbar span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.quickpills{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.qpill{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:30px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;}
+.qpill.active{outline:2px solid currentColor;}
+.qp-blue{background:#e8f1ff;color:#2563eb;}
+.qp-pink{background:#ffe8ef;color:#e11d6f;}
+.qp-green{background:#e6f9f0;color:#0e9f6e;}
+.qp-purple{background:#f1e8ff;color:#7c3aed;}
 .mobile-filter-toggle{display:none;width:auto;margin-bottom:10px;}
 @media (max-width:700px){
   .storelayout{flex-direction:column;}
@@ -131,6 +141,7 @@ let isAdmin = false;
 let filterCat = 'All';
 let filterAge = 'All';
 let filterSize = 'All';
+let searchQuery = '';
 
 const CATEGORIES = [
   'Newborn Collection','Baby Boy','Baby Girl','Romper & Bodysuit',
@@ -218,11 +229,26 @@ function renderStore(){
         </select>
       </div>
       <div class="storecontent">
+        <div class="searchbar"><span>🔍</span><input id="searchBox" value="${searchQuery}" placeholder="Search a product" oninput="setSearchQuery(this.value)"></div>
+        <div class="quickpills">
+          <div class="qpill qp-blue ${filterCat==='Newborn Collection'?'active':''}" onclick="setFilterCat('Newborn Collection')">👶 Newborn</div>
+          <div class="qpill qp-pink ${filterCat==='Baby Girl'?'active':''}" onclick="setFilterCat('Baby Girl')">👧 Girl</div>
+          <div class="qpill qp-green ${filterCat==='Baby Boy'?'active':''}" onclick="setFilterCat('Baby Boy')">👦 Boy</div>
+          <div class="qpill qp-purple ${filterCat==='Baby Accessories'?'active':''}" onclick="setFilterCat('Baby Accessories')">🧦 Accessories</div>
+        </div>
         <div class="grid" id="prodGrid"></div>
       </div>
     </div>`;
+  renderProductGrid();
+}
+function renderProductGrid(){
   const grid = document.getElementById('prodGrid');
-  const filtered = getFilteredProducts();
+  if(!grid) return;
+  let filtered = getFilteredProducts();
+  if(searchQuery.trim()){
+    const q = searchQuery.trim().toLowerCase();
+    filtered = filtered.filter(p=>(p.name||'').toLowerCase().includes(q) || (p.subcategory||'').toLowerCase().includes(q));
+  }
   if(!filtered.length){ grid.innerHTML = '<p>এই ফিল্টারে কোনো প্রোডাক্ট নেই।</p>'; }
   filtered.forEach(p=>{
     const low = p.stock<=5, out = p.stock<=0;
@@ -239,6 +265,7 @@ function renderStore(){
   updateCartCount();
 }
 function toggleSidebar(){ document.getElementById('sidebarPanel').classList.toggle('open'); }
+function setSearchQuery(v){ searchQuery=v; renderProductGrid(); }
 function setFilterCat(c){ filterCat=c; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
 function setFilterSize(s){ filterSize=s; renderStore(); }
