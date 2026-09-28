@@ -130,7 +130,6 @@ th{background:var(--border);}
   <h1 onclick="showView('store')">👶 Baby Poshak</h1>
   <div class="navicons">
     <div class="navicon" onclick="showStores()"><span class="ic">📍</span><small>Stores</small></div>
-    <div class="navicon" onclick="showView('admin')"><span class="ic">👤</span><small>Profile</small></div>
     <div class="navicon" onclick="openWishlist()"><span class="ic">♡</span><small>Wishlist</small><span class="navbadge" id="wishCount">0</span></div>
     <div class="navicon" onclick="openCart()"><span class="ic">🛍</span><small>Bag</small><span class="navbadge" id="cartCount2">0</span></div>
   </div>
@@ -138,19 +137,16 @@ th{background:var(--border);}
 <div class="navwrap"><nav class="categorynav" id="categoryNav"></nav><div class="megapanel" id="megaPanel"></div></div>
 <main>
   <div id="storeView"></div>
-  <div id="adminView" class="hidden"></div>
 </main>
 <button class="cartfab hidden" id="cartFab" onclick="openCart()">🛒 <span id="cartCount">0</span></button>
 
 <!-- Firebase (compat SDK, works with plain script tags) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const auth = firebase.auth();
 
 // ⚠️ এখানে আপনার বিজনেসের আসল ফোন/হোয়াটসঅ্যাপ নম্বর বসান (দেশের কোড সহ, + ছাড়া)
 const BUSINESS_PHONE = "8801712863183";
@@ -160,7 +156,6 @@ function save(key,val){ try{ localStorage.setItem(key, JSON.stringify(val)); }ca
 let products = [];
 let orders = [];
 let cart = {};
-let isAdmin = false;
 let filterCat = 'All';
 let filterAge = 'All';
 let filterSize = 'All';
@@ -202,19 +197,11 @@ db.collection('products').onSnapshot(snap=>{
     return {id:d.id, ...data, createdAtMs: data.createdAt ? data.createdAt.toMillis() : 0};
   });
   if(!document.getElementById('storeView').classList.contains('hidden')) renderStore();
-  if(isAdmin && adminTab==='products') renderAdminBody();
 });
-db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap=>{
-  orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  if(isAdmin && (adminTab==='orders'||adminTab==='analytics')) renderAdminBody();
-});
-auth.onAuthStateChanged(u=>{ isAdmin = !!u; renderAdmin(); });
 
 function showView(v){
-  document.getElementById('storeView').classList.toggle('hidden', v!=='store');
-  document.getElementById('adminView').classList.toggle('hidden', v!=='admin');
-  document.getElementById('cartFab').classList.toggle('hidden', v!=='store');
-  if(v==='store') renderStore(); else renderAdmin();
+  document.getElementById('cartFab').classList.remove('hidden');
+  renderStore();
 }
 
 // ---------- STORE ----------
@@ -223,8 +210,7 @@ function getFilteredProducts(){
   if(filterCat==='NewArrival'){
     base = [...products].sort((a,b)=>(b.createdAtMs||0)-(a.createdAtMs||0)).slice(0,10);
   } else if(filterCat==='TopSelling'){
-    const sales={}; orders.forEach(o=>o.items.forEach(i=>{ sales[i.id]=(sales[i.id]||0)+i.qty; }));
-    base = products.filter(p=>sales[p.id]).sort((a,b)=>(sales[b.id]||0)-(sales[a.id]||0));
+    base = products.filter(p=>(p.sold||0)>0).sort((a,b)=>(b.sold||0)-(a.sold||0));
   } else if(filterCat==='MegaDeal'){
     base = products.filter(p=>p.originalPrice && p.originalPrice>p.price && (p.originalPrice-p.price)/p.originalPrice>=0.2);
   } else if(filterCat==='FreeDelivery'){
@@ -455,10 +441,12 @@ async function placeOrder(){
   const items = Object.entries(cart).filter(([id,q])=>q>0).map(([id,q])=>{ const p=products.find(x=>x.id===id); return {id,name:p.name,price:p.price,qty:q}; });
   if(!items.length){ alert('কার্ট খালি'); return; }
   const total = items.reduce((s,i)=>s+i.price*i.qty,0);
-  await db.collection('orders').add({ name, phone, addr, pay, items, total, status:'Pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  try{
+    await db.collection('orders').add({ name, phone, addr, pay, items, total, status:'Pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }catch(e){ alert('অর্ডার পাঠানো যায়নি, আবার চেষ্টা করুন'); return; }
   for(const it of items){
-    const p = products.find(x=>x.id===it.id);
-    if(p) await db.collection('products').doc(it.id).update({ stock: Math.max(0,p.stock-it.qty) });
+    try{ await db.collection('products').doc(it.id).update({ stock: firebase.firestore.FieldValue.increment(-it.qty), sold: firebase.firestore.FieldValue.increment(it.qty) }); }
+    catch(e){ console.warn('stock update failed', e); }
   }
   const msg = encodeURIComponent(`নতুন অর্ডার - Baby Poshak\nনাম: ${name}\nমোবাইল: ${phone}\nঠিকানা: ${addr}\nপেমেন্ট: ${pay}\n${items.map(i=>`- ${i.name} x${i.qty} = ৳${i.price*i.qty}`).join('\n')}\nমোট: ৳${total}`);
   cart={}; updateCartCount();
@@ -473,121 +461,6 @@ function showSheet(html){
   ov.onclick=(e)=>{ if(e.target===ov) closeSheet(); };
 }
 function closeSheet(){ const ov=document.getElementById('sheetOverlay'); if(ov) ov.remove(); }
-
-// ---------- ADMIN ----------
-let adminTab='products';
-function renderAdmin(){
-  const el = document.getElementById('adminView');
-  if(!isAdmin){
-    el.innerHTML = `<div class="card" style="max-width:340px;margin:30px auto;">
-      <h3>Admin লগইন</h3>
-      <label>ইমেইল</label><input id="aEmail" type="email">
-      <label>পাসওয়ার্ড</label><input id="aPass" type="password">
-      <button class="primary" style="width:100%" onclick="adminLogin()">লগইন</button>
-      <p class="note">Firebase Console → Authentication এ আপনার admin ইমেইল/পাসওয়ার্ড আগে থেকে তৈরি করে নিন।</p>
-    </div>`;
-    return;
-  }
-  el.innerHTML = `<div style="text-align:right;margin-bottom:8px"><button class="secondary" onclick="auth.signOut()">লগআউট</button></div>
-    <div class="subtabs">
-      <button class="${adminTab==='products'?'active':''}" onclick="setAdminTab('products')">📦 প্রোডাক্ট</button>
-      <button class="${adminTab==='orders'?'active':''}" onclick="setAdminTab('orders')">🧾 অর্ডার</button>
-      <button class="${adminTab==='analytics'?'active':''}" onclick="setAdminTab('analytics')">📊 রিপোর্ট</button>
-    </div>
-    <div id="adminBody"></div>`;
-  renderAdminBody();
-}
-async function adminLogin(){
-  const email=document.getElementById('aEmail').value.trim();
-  const pass=document.getElementById('aPass').value;
-  try{ await auth.signInWithEmailAndPassword(email,pass); }
-  catch(e){ alert('লগইন ব্যর্থ: '+e.message); }
-}
-function setAdminTab(t){ adminTab=t; renderAdminBody(); document.querySelectorAll('.subtabs button').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); }
-function renderAdminBody(){
-  const body = document.getElementById('adminBody'); if(!body) return;
-  if(adminTab==='products'){
-    body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
-    <div class="overflow-x"><table><tr><th>ছবি</th><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>বয়স</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
-    ${products.map(p=>`<tr><td>${p.imageUrl?`<img src="${p.imageUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">`:p.emoji}</td><td>${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>${p.size||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
-      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
-    </table></div>`;
-  } else if(adminTab==='orders'){
-    body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>নাম</th><th>মোবাইল</th><th>মোট</th><th>পেমেন্ট</th><th>স্ট্যাটাস</th></tr>
-    ${orders.map(o=>`<tr><td>${o.name}</td><td>${o.phone}</td><td>৳${o.total}</td><td>${o.pay}</td>
-      <td><select onchange="updateStatus('${o.id}',this.value)">${['Pending','Confirmed','Shipped','Delivered'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}
-    </table></div>` : '<p>এখনো কোনো অর্ডার নেই।</p>';
-  } else if(adminTab==='analytics'){
-    const totalSales = orders.reduce((s,o)=>s+o.total,0);
-    const lowStock = products.filter(p=>p.stock<=5).length;
-    const salesByProduct={};
-    orders.forEach(o=>o.items.forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+i.qty; }));
-    const top = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    body.innerHTML = `<div class="statgrid">
-        <div class="stat"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
-        <div class="stat"><div class="statnum">${orders.length}</div><div class="statlabel">মোট অর্ডার</div></div>
-        <div class="stat"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
-      </div>
-      <h3>টপ সেলিং প্রোডাক্ট</h3>
-      ${top.length? '<ol>'+top.map(([n,q])=>`<li>${n} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
-  }
-}
-async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
-function editProduct(id){
-  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
-  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
-    <label>নাম</label><input id="pName" value="${p.name}">
-    <label>Image URL</label>
-    <a href="https://postimages.org" target="_blank" class="secondary" style="display:inline-block;text-decoration:none;padding:8px 12px;font-size:13px;margin-bottom:8px;">📤 postimages.org খুলুন (ছবি আপলোড করে "Direct link" কপি করুন)</a>
-    <input id="pImg" value="${p.imageUrl||''}" placeholder="এখানে Direct link পেস্ট করুন">
-    <label>আরও ছবি (গ্যালারি, একাধিক হলে কমা দিয়ে আলাদা করুন — ঐচ্ছিক)</label><input id="pExtraImg" value="${p.extraImages||''}" placeholder="url1, url2, url3">
-    <label>ইমোজি/আইকন (ছবি না থাকলে এটা দেখাবে)</label><input id="pEmoji" value="${p.emoji}">
-    <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
-    <label>আগের দাম (ঐচ্ছিক — ডিসকাউন্ট দেখাতে চাইলে)</label><input id="pOldPrice" type="number" value="${p.originalPrice||''}">
-    <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
-    <label>Main Category</label>
-    <select id="pCat">${CATEGORIES.map(c=>`<option ${p.category===c?'selected':''}>${c}</option>`).join('')}</select>
-    <label>Sub-category (যেমন: Frock, Romper, T-Shirt)</label><input id="pSubcat" value="${p.subcategory||''}">
-    <label>Age/Size</label>
-    <select id="pAge"><option value="">— নির্বাচন করুন —</option>${AGE_GROUPS.map(a=>`<option ${p.ageGroup===a?'selected':''}>${a}</option>`).join('')}</select>
-    <label>Size Number</label>
-    <select id="pSize"><option value="">— নির্বাচন করুন —</option>${SIZES.map(s=>`<option ${p.size===s?'selected':''}>${s}</option>`).join('')}</select>
-    <details style="margin:-6px 0 12px;font-size:12px;">
-      <summary style="cursor:pointer;color:var(--muted)">📏 Size Chart দেখুন (Chest/Height রেফারেন্স)</summary>
-      <div class="overflow-x" style="margin-top:6px"><table>
-        <tr><th>Size</th><th>বয়স</th><th>Height</th><th>Chest</th></tr>
-        ${SIZE_CHART.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}
-      </table></div>
-    </details>
-    <label>Key Features (প্রতি লাইনে একটা ফিচার লিখুন)</label>
-    <textarea id="pFeatures" rows="4" placeholder="100% Cotton\nSoft & breathable\nMachine washable">${p.features||''}</textarea>
-    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="pFreeDel" style="width:auto;margin:0;" ${p.freeDelivery?'checked':''}> Free Delivery</label>
-    <button class="primary" style="width:100%" onclick="saveProduct('${id||''}')">সেভ করুন</button>`);
-}
-async function saveProduct(id){
-  const name=document.getElementById('pName').value.trim();
-  const imageUrl=document.getElementById('pImg').value.trim();
-  const extraImages=document.getElementById('pExtraImg').value.trim();
-  const emoji=document.getElementById('pEmoji').value.trim()||'👶';
-  const price=parseFloat(document.getElementById('pPrice').value)||0;
-  const originalPrice=parseFloat(document.getElementById('pOldPrice').value)||0;
-  const stock=parseInt(document.getElementById('pStock').value)||0;
-  const category=document.getElementById('pCat').value;
-  const subcategory=document.getElementById('pSubcat').value.trim();
-  const ageGroup=document.getElementById('pAge').value;
-  const size=document.getElementById('pSize').value;
-  const features=document.getElementById('pFeatures').value.trim();
-  const freeDelivery=document.getElementById('pFreeDel').checked;
-  if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
-  const data = {name,emoji,price,originalPrice,stock,category,subcategory,ageGroup,size,imageUrl,extraImages,features,freeDelivery};
-  if(id){ await db.collection('products').doc(id).update(data); }
-  else{ data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection('products').add(data); }
-  closeSheet();
-}
-async function deleteProduct(id){
-  if(!confirm('এই প্রোডাক্টটি ডিলিট করবেন?')) return;
-  await db.collection('products').doc(id).delete();
-}
 
 showView('store');
 </script>

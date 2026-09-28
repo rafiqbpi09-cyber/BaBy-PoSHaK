@@ -17,7 +17,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /products/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create, delete: if request.auth != null;
+      allow update: if request.auth != null
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock','sold'])
+            && request.resource.data.stock >= 0
+            && request.resource.data.stock < resource.data.stock);
     }
     match /orders/{doc} {
       allow create: if true;
@@ -26,11 +30,13 @@ service cloud.firestore {
   }
 }
 ```
-এতে যেকেউ প্রোডাক্ট দেখতে পারবে ও অর্ডার দিতে পারবে, কিন্তু শুধু লগইন করা Admin প্রোডাক্ট এডিট বা অর্ডার স্ট্যাটাস চেঞ্জ করতে পারবে।
+এতে যেকেউ প্রোডাক্ট দেখতে পারবে, অর্ডার দিতে পারবে (এবং অর্ডারের সময় শুধু স্টক কমতে পারবে), কিন্তু শুধু লগইন করা Admin প্রোডাক্ট এডিট বা অর্ডার স্ট্যাটাস চেঞ্জ করতে পারবে।
 
 ## ধাপ ৩: GitHub এ আপলোড ও Pages এ হোস্ট করা
 1. GitHub এ নতুন একটা repository বানান (যেমন `baby-poshak`)।
-2. `index.html` এবং `firebase-config.js` (config বসানোর পর) এই দুইটা ফাইল রিপোতে আপলোড করুন।
+2. `index.html` (কাস্টমার পেজ), `admin.html` (শুধু আপনার জন্য Admin পেজ) এবং `firebase-config.js` — এই তিনটা ফাইল রিপোতে আপলোড করুন।
+   - কাস্টমার লিংক: `https://yourusername.github.io/baby-poshak/`
+   - Admin লিংক: `https://yourusername.github.io/baby-poshak/admin.html` (এই লিংক কাস্টমারদের দেবেন না, শুধু নিজে বুকমার্ক করে রাখুন)
 3. Repo → **Settings → Pages** → Source: **Deploy from a branch** → branch: `main`, folder: `/root` → **Save**।
 4. কিছুক্ষণ পর একটা লিংক পাবেন — যেমন `https://yourusername.github.io/baby-poshak/` — এটাই আপনার লাইভ অ্যাপ, সবার জন্য একই ডেটা শেয়ার হবে।
 

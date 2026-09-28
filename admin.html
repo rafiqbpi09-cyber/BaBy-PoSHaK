@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baby Poshak Admin</title>
+<style>
+:root{
+  --pink:#ff8fab; --pink-dark:#e85d8a; --cream:#fff8f2; --card:#ffffff;
+  --text:#3a2e2e; --muted:#8a7b7b; --border:#f0dfe3; --accent:#7fd8be;
+  --bg:var(--cream); --shadow:0 4px 14px rgba(232,93,138,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#221a1d; --card:#2e2427; --text:#f5e9ea; --muted:#b39a9a; --border:#4a3a3d; }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
+header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--pink),var(--pink-dark));color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);flex-wrap:wrap;gap:10px;}
+header h1{margin:0;font-size:20px;cursor:pointer;}
+.navicons{display:flex;gap:18px;align-items:center;}
+.navicon{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px;color:#fff;position:relative;}
+.navicon span.ic{font-size:18px;}
+.navbadge{position:absolute;top:-6px;right:-10px;background:#fff;color:var(--pink-dark);border-radius:10px;font-size:10px;font-weight:800;padding:1px 5px;}
+.navwrap{position:sticky;top:62px;z-index:9;background:var(--card);border-bottom:1px solid var(--border);}
+.categorynav{display:flex;overflow-x:auto;padding:0 8px;}
+.navitem{flex-shrink:0;padding:12px 14px;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;}
+.navitem:hover{color:var(--pink-dark);}
+.navitem.active{color:var(--pink-dark);border-bottom-color:var(--pink-dark);}
+.megapanel{display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);box-shadow:0 14px 26px rgba(0,0,0,.2);max-height:70vh;overflow-y:auto;z-index:50;padding:18px 24px 20px;border-top:1px solid var(--border);}
+.megapanel.open{display:block;}
+.megahead{color:var(--pink-dark);font-weight:800;font-size:13px;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px;}
+.megagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 28px;}
+.megaitem{padding:8px 0;font-size:14px;cursor:pointer;}
+.megaitem:hover{color:var(--pink-dark);font-weight:600;}
+.megaview{margin-top:14px;color:var(--pink-dark);font-weight:700;font-size:13px;cursor:pointer;}
+.megaoverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:45;}
+.megaoverlay.open{display:block;}
+.tabbtn{background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;}
+.tabbtn.active{background:#fff;color:var(--pink-dark);font-weight:600;}
+main{max-width:900px;margin:0 auto;padding:16px;padding-bottom:90px;}
+.hidden{display:none !important;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+.card{background:var(--card);border-radius:16px;padding:14px;box-shadow:var(--shadow);border:1px solid var(--border);}
+.emoji{font-size:40px;text-align:center;margin-bottom:6px;}
+.pname{font-weight:600;font-size:15px;margin:4px 0 2px;}
+.pprice{color:var(--pink-dark);font-weight:700;}
+.pstock{font-size:12px;color:var(--muted);}
+.pstock.low{color:#d9534f;font-weight:600;}
+button.buy{width:100%;margin-top:8px;background:var(--pink);color:#fff;border:none;padding:9px;border-radius:10px;font-weight:600;cursor:pointer;}
+button.buy:disabled{background:#ccc;cursor:not-allowed;}
+.cartfab{position:fixed;bottom:20px;right:20px;background:var(--pink-dark);color:#fff;border:none;border-radius:50px;padding:14px 20px;font-weight:700;box-shadow:var(--shadow);cursor:pointer;z-index:20;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:var(--card);width:100%;max-width:500px;border-radius:20px 20px 0 0;padding:20px;max-height:85vh;overflow-y:auto;position:relative;}
+.cartrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.qtybtn{background:var(--border);border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-weight:700;}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;margin:6px 0 12px;background:var(--card);color:var(--text);font-size:14px;}
+label{font-size:13px;color:var(--muted);}
+.total{font-size:18px;font-weight:700;margin:10px 0;}
+.primary{background:var(--pink-dark);color:#fff;border:none;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;}
+.secondary{background:var(--border);color:var(--text);border:none;padding:12px;border-radius:10px;font-weight:600;cursor:pointer;}
+.close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:12px;overflow:hidden;}
+th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--border);}
+th{background:var(--border);}
+.smallbtn{padding:5px 9px;border-radius:6px;border:none;font-size:12px;cursor:pointer;margin-right:4px;}
+.edit{background:var(--accent);color:#083b2c;}
+.del{background:#d9534f;color:#fff;}
+.overflow-x{overflow-x:auto;}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px;}
+.stat{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);text-align:center;}
+.statnum{font-size:24px;font-weight:800;color:var(--pink-dark);}
+.statlabel{font-size:12px;color:var(--muted);}
+.subtabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.subtabs button{background:var(--card);border:1px solid var(--border);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;}
+.subtabs button.active{background:var(--pink);color:#fff;border-color:var(--pink);}
+.note{font-size:12px;color:var(--muted);margin-top:10px;}
+.breadcrumb{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.detail-gallery{display:flex;gap:8px;margin-bottom:10px;}
+.thumbs{display:flex;flex-direction:column;gap:6px;}
+.thumbs img{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer;}
+.mainimg{flex:1;width:100%;max-height:240px;object-fit:cover;border-radius:12px;cursor:zoom-in;}
+.oldprice{text-decoration:line-through;color:var(--muted);font-size:14px;margin-left:6px;}
+.qtyrow{display:flex;align-items:center;gap:10px;margin:10px 0;}
+.qtybox{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
+.btn2col{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+.btn2col a,.btn2col button{display:block;text-align:center;text-decoration:none;padding:11px;border-radius:9px;font-weight:700;font-size:13px;border:none;cursor:pointer;}
+.bt-cart{background:var(--pink);color:#fff;}
+.bt-order{background:#222;color:#fff;}
+.bt-call{background:#222;color:#fff;}
+.bt-wa{background:#25D366;color:#fff;}
+.sharegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0;}
+.sharegrid button{border:none;border-radius:8px;padding:8px 4px;font-size:11px;cursor:pointer;font-weight:700;color:#fff;}
+.sh-fb{background:#1877F2;}
+.sh-msg{background:linear-gradient(45deg,#00B2FF,#006AFF,#A033FF,#FF5280);}
+.sh-wa{background:#25D366;}
+.sh-copy{background:#6c6c6c;}
+.features-list{margin:8px 0;padding-left:18px;font-size:13px;}
+.features-list li{margin-bottom:3px;}
+.storelayout{display:flex;gap:16px;align-items:flex-start;}
+.sidebar{width:220px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.sidebar h4{margin:14px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.sidebar h4:first-child{margin-top:0;}
+.sidebar-link{display:flex;justify-content:space-between;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;}
+.sidebar-link:hover{background:var(--border);}
+.sidebar-link.active{background:var(--pink);color:#fff;}
+.sidebar-link .cnt{color:var(--muted);font-size:11px;}
+.sidebar-link.active .cnt{color:#fff;}
+.storecontent{flex:1;min-width:0;}
+.searchbar{position:relative;margin-bottom:14px;}
+.searchbar input{padding:12px 12px 12px 38px;border-radius:10px;margin:0;}
+.searchbar span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.quickpills{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.qpill{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:30px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;}
+.qpill.active{outline:2px solid currentColor;}
+.qp-blue{background:#e8f1ff;color:#2563eb;}
+.qp-pink{background:#ffe8ef;color:#e11d6f;}
+.qp-green{background:#e6f9f0;color:#0e9f6e;}
+.qp-purple{background:#f1e8ff;color:#7c3aed;}
+.mobile-filter-toggle{display:none;width:auto;margin-bottom:10px;}
+@media (max-width:700px){
+  .storelayout{flex-direction:column;}
+  .sidebar{width:100%;display:none;}
+  .sidebar.open{display:block;}
+  .mobile-filter-toggle{display:inline-block;}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠 Baby Poshak Admin</h1>
+  <a href="index.html" class="navicon" style="text-decoration:none"><span class="ic">🛍</span><small>দোকান দেখুন</small></a>
+</header>
+<main>
+  <div id="adminView"></div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let products = [];
+let orders = [];
+let isAdmin = false;
+
+const CATEGORIES = [
+  'Newborn Collection','Baby Boy','Baby Girl','Romper & Bodysuit',
+  'Baby Nightwear','Summer Collection','Winter Collection','Party & Occasion',
+  'Traditional Collection','Baby Gift Set','Baby Accessories','Matching Collection'
+];
+const AGE_GROUPS = ['0-3M','3-6M','6-12M','1-2Y','2-3Y','3-4Y','4-5Y','5-6Y','6-7Y','7-9Y','9-11Y'];
+const SIZES = ['0','1','2','3','4','5','6','7','8','10','12'];
+const SUBCATS = {
+  'Newborn Collection': ['Newborn Romper','Newborn Bodysuit','Sleepsuit','Baby Frock','Baby Shirt','Baby Pant','Baby Set','Swaddle','Newborn Cap','Mitten & Socks Set'],
+  'Baby Boy': ['T-Shirt','Polo Shirt','Shirt','Denim Shirt','Shorts','Long Pant','Jogger Pant','Cargo Pant','Panjabi','Kurta','Waistcoat',"Boy's Dress Set","Boy's Party Dress"],
+  'Baby Girl': ['Frock','Gown','Top','T-Shirt','Skirt','Leggings','Palazzo','Salwar Kameez','Kurti',"Girl's Dress Set",'Party Dress','Princess Dress'],
+  'Romper & Bodysuit': ['Half Sleeve Romper','Full Sleeve Romper','Sleeveless Romper','Cotton Romper','Printed Romper','Cartoon Romper','Bodysuit','Sleepsuit','Footed Romper'],
+  'Baby Nightwear': ['Night Suit','Pajama Set','Sleepsuit','Night Frock','Cotton Night Dress','Winter Night Suit'],
+  'Summer Collection': ['Cotton T-Shirt','Cotton Frock','Sleeveless Dress','Shorts','Cotton Set','Light Romper','Summer Pajama'],
+  'Winter Collection': ['Baby Jacket','Hoodie','Sweater','Cardigan','Winter Frock','Winter Pant','Winter Set','Thermal Wear','Baby Blanket'],
+  'Party & Occasion': ['Birthday Dress','Party Frock','Princess Dress','Wedding Dress','Eid Dress','Puja/Traditional Dress','Ceremony Dress','Designer Baby Dress'],
+  'Traditional Collection': ['Baby Panjabi','Baby Kurta','Panjabi Pajama Set',"Boy's Eid Set","Girl's Salwar Kameez","Girl's Kurti",'Traditional Frock'],
+  'Baby Gift Set': ['Newborn Gift Box','Baby Dress Set','Romper Gift Set','Boy Gift Set','Girl Gift Set','Birthday Gift Set','Baby Accessories Gift Set'],
+  'Baby Accessories': ['Baby Cap','Baby Socks','Baby Mittens','Baby Bib','Baby Shoes','Hair Band','Hair Clip','Headband','Baby Gloves','Baby Towel'],
+  'Matching Collection': ['Mother & Daughter','Father & Son','Brother & Sister','Family Matching','Couple & Baby Matching']
+};
+const SIZE_CHART = [
+  ['0','0–3 মাস','50–60 cm','16–18"'],['1','3–6 মাস','60–68 cm','17–19"'],['2','6–12 মাস','68–76 cm','18–20"'],
+  ['3','1–2 বছর','76–86 cm','19–21"'],['4','2–3 বছর','86–96 cm','20–22"'],['5','3–4 বছর','96–104 cm','21–23"'],
+  ['6','4–5 বছর','104–112 cm','22–24"'],['7','5–6 বছর','112–120 cm','23–25"'],['8','6–7 বছর','120–128 cm','24–26"'],
+  ['10','7–9 বছর','128–138 cm','25–28"'],['12','9–11 বছর','138–148 cm','27–30"']
+];
+
+db.collection('products').onSnapshot(snap=>{
+  products = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  if(isAdmin && adminTab==='products') renderAdminBody();
+});
+let unsubOrders = null;
+auth.onAuthStateChanged(u=>{
+  isAdmin = !!u;
+  if(u && !unsubOrders){
+    unsubOrders = db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap=>{
+      orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      if(isAdmin && (adminTab==='orders'||adminTab==='analytics')) renderAdminBody();
+    });
+  }
+  if(!u && unsubOrders){ unsubOrders(); unsubOrders = null; orders = []; }
+  renderAdmin();
+});
+
+function showSheet(html){
+  let ov = document.getElementById('sheetOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='sheetOverlay'; ov.className='overlay'; document.body.appendChild(ov); }
+  ov.innerHTML = `<div class="sheet">${html}</div>`;
+  ov.onclick=(e)=>{ if(e.target===ov) closeSheet(); };
+}
+function closeSheet(){ const ov=document.getElementById('sheetOverlay'); if(ov) ov.remove(); }
+
+// ---------- ADMIN ----------
+let adminTab='products';
+function renderAdmin(){
+  const el = document.getElementById('adminView');
+  if(!isAdmin){
+    el.innerHTML = `<div class="card" style="max-width:340px;margin:30px auto;">
+      <h3>Admin লগইন</h3>
+      <label>ইমেইল</label><input id="aEmail" type="email">
+      <label>পাসওয়ার্ড</label><input id="aPass" type="password">
+      <button class="primary" style="width:100%" onclick="adminLogin()">লগইন</button>
+      <p class="note">Firebase Console → Authentication এ আপনার admin ইমেইল/পাসওয়ার্ড আগে থেকে তৈরি করে নিন।</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div style="text-align:right;margin-bottom:8px"><button class="secondary" onclick="auth.signOut()">লগআউট</button></div>
+    <div class="subtabs">
+      <button class="${adminTab==='products'?'active':''}" onclick="setAdminTab('products')">📦 প্রোডাক্ট</button>
+      <button class="${adminTab==='orders'?'active':''}" onclick="setAdminTab('orders')">🧾 অর্ডার</button>
+      <button class="${adminTab==='analytics'?'active':''}" onclick="setAdminTab('analytics')">📊 রিপোর্ট</button>
+    </div>
+    <div id="adminBody"></div>`;
+  renderAdminBody();
+}
+async function adminLogin(){
+  const email=document.getElementById('aEmail').value.trim();
+  const pass=document.getElementById('aPass').value;
+  try{ await auth.signInWithEmailAndPassword(email,pass); }
+  catch(e){ alert('লগইন ব্যর্থ: '+e.message); }
+}
+function setAdminTab(t){ adminTab=t; renderAdminBody(); document.querySelectorAll('.subtabs button').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); }
+function renderAdminBody(){
+  const body = document.getElementById('adminBody'); if(!body) return;
+  if(adminTab==='products'){
+    body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
+    <div class="overflow-x"><table><tr><th>ছবি</th><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>বয়স</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
+    ${products.map(p=>`<tr><td>${p.imageUrl?`<img src="${p.imageUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">`:p.emoji}</td><td>${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>${p.size||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
+      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
+    </table></div>`;
+  } else if(adminTab==='orders'){
+    body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>নাম</th><th>মোবাইল</th><th>মোট</th><th>পেমেন্ট</th><th>স্ট্যাটাস</th></tr>
+    ${orders.map(o=>`<tr><td>${o.name}</td><td>${o.phone}</td><td>৳${o.total}</td><td>${o.pay}</td>
+      <td><select onchange="updateStatus('${o.id}',this.value)">${['Pending','Confirmed','Shipped','Delivered'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}
+    </table></div>` : '<p>এখনো কোনো অর্ডার নেই।</p>';
+  } else if(adminTab==='analytics'){
+    const totalSales = orders.reduce((s,o)=>s+o.total,0);
+    const lowStock = products.filter(p=>p.stock<=5).length;
+    const salesByProduct={};
+    orders.forEach(o=>o.items.forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+i.qty; }));
+    const top = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    body.innerHTML = `<div class="statgrid">
+        <div class="stat"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
+        <div class="stat"><div class="statnum">${orders.length}</div><div class="statlabel">মোট অর্ডার</div></div>
+        <div class="stat"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
+      </div>
+      <h3>টপ সেলিং প্রোডাক্ট</h3>
+      ${top.length? '<ol>'+top.map(([n,q])=>`<li>${n} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
+  }
+}
+async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
+function editProduct(id){
+  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
+    <label>নাম</label><input id="pName" value="${p.name}">
+    <label>Image URL</label>
+    <a href="https://postimages.org" target="_blank" class="secondary" style="display:inline-block;text-decoration:none;padding:8px 12px;font-size:13px;margin-bottom:8px;">📤 postimages.org খুলুন (ছবি আপলোড করে "Direct link" কপি করুন)</a>
+    <input id="pImg" value="${p.imageUrl||''}" placeholder="এখানে Direct link পেস্ট করুন">
+    <label>আরও ছবি (গ্যালারি, একাধিক হলে কমা দিয়ে আলাদা করুন — ঐচ্ছিক)</label><input id="pExtraImg" value="${p.extraImages||''}" placeholder="url1, url2, url3">
+    <label>ইমোজি/আইকন (ছবি না থাকলে এটা দেখাবে)</label><input id="pEmoji" value="${p.emoji}">
+    <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
+    <label>আগের দাম (ঐচ্ছিক — ডিসকাউন্ট দেখাতে চাইলে)</label><input id="pOldPrice" type="number" value="${p.originalPrice||''}">
+    <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
+    <label>Main Category</label>
+    <select id="pCat">${CATEGORIES.map(c=>`<option ${p.category===c?'selected':''}>${c}</option>`).join('')}</select>
+    <label>Sub-category (যেমন: Frock, Romper, T-Shirt)</label><input id="pSubcat" value="${p.subcategory||''}">
+    <label>Age/Size</label>
+    <select id="pAge"><option value="">— নির্বাচন করুন —</option>${AGE_GROUPS.map(a=>`<option ${p.ageGroup===a?'selected':''}>${a}</option>`).join('')}</select>
+    <label>Size Number</label>
+    <select id="pSize"><option value="">— নির্বাচন করুন —</option>${SIZES.map(s=>`<option ${p.size===s?'selected':''}>${s}</option>`).join('')}</select>
+    <details style="margin:-6px 0 12px;font-size:12px;">
+      <summary style="cursor:pointer;color:var(--muted)">📏 Size Chart দেখুন (Chest/Height রেফারেন্স)</summary>
+      <div class="overflow-x" style="margin-top:6px"><table>
+        <tr><th>Size</th><th>বয়স</th><th>Height</th><th>Chest</th></tr>
+        ${SIZE_CHART.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}
+      </table></div>
+    </details>
+    <label>Key Features (প্রতি লাইনে একটা ফিচার লিখুন)</label>
+    <textarea id="pFeatures" rows="4" placeholder="100% Cotton\nSoft & breathable\nMachine washable">${p.features||''}</textarea>
+    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="pFreeDel" style="width:auto;margin:0;" ${p.freeDelivery?'checked':''}> Free Delivery</label>
+    <button class="primary" style="width:100%" onclick="saveProduct('${id||''}')">সেভ করুন</button>`);
+}
+async function saveProduct(id){
+  const name=document.getElementById('pName').value.trim();
+  const imageUrl=document.getElementById('pImg').value.trim();
+  const extraImages=document.getElementById('pExtraImg').value.trim();
+  const emoji=document.getElementById('pEmoji').value.trim()||'👶';
+  const price=parseFloat(document.getElementById('pPrice').value)||0;
+  const originalPrice=parseFloat(document.getElementById('pOldPrice').value)||0;
+  const stock=parseInt(document.getElementById('pStock').value)||0;
+  const category=document.getElementById('pCat').value;
+  const subcategory=document.getElementById('pSubcat').value.trim();
+  const ageGroup=document.getElementById('pAge').value;
+  const size=document.getElementById('pSize').value;
+  const features=document.getElementById('pFeatures').value.trim();
+  const freeDelivery=document.getElementById('pFreeDel').checked;
+  if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
+  const data = {name,emoji,price,originalPrice,stock,category,subcategory,ageGroup,size,imageUrl,extraImages,features,freeDelivery};
+  if(id){ await db.collection('products').doc(id).update(data); }
+  else{ data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection('products').add(data); }
+  closeSheet();
+}
+async function deleteProduct(id){
+  if(!confirm('এই প্রোডাক্টটি ডিলিট করবেন?')) return;
+  await db.collection('products').doc(id).delete();
+}
+
+renderAdmin();
+</script>
+</body>
+</html>
