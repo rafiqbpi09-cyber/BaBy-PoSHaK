@@ -24,8 +24,17 @@ service cloud.firestore {
             && request.resource.data.stock < resource.data.stock);
     }
     match /orders/{doc} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null;
+      allow get: if true;
+      allow list, update, delete: if request.auth != null;
+      allow create: if doc.matches('BP-[A-Z0-9]{8}')
+        && request.resource.data.keys().hasOnly(['name','phone','addr','pay','items','total','status','history','createdAt'])
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.name is string && request.resource.data.name.size() < 100
+        && request.resource.data.phone is string && request.resource.data.phone.size() < 20
+        && request.resource.data.addr is string && request.resource.data.addr.size() < 400
+        && request.resource.data.total is number
+        && request.resource.data.items is list && request.resource.data.items.size() <= 50;
     }
   }
 }

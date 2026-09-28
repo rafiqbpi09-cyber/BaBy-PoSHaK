@@ -239,26 +239,104 @@ function renderAdminBody(){
       <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
     </table></div>`;
   } else if(adminTab==='orders'){
-    body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>নাম</th><th>মোবাইল</th><th>মোট</th><th>পেমেন্ট</th><th>স্ট্যাটাস</th></tr>
-    ${orders.map(o=>`<tr><td>${o.name}</td><td>${o.phone}</td><td>৳${o.total}</td><td>${o.pay}</td>
-      <td><select onchange="updateStatus('${o.id}',this.value)">${['Pending','Confirmed','Shipped','Delivered'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}
+    body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>অর্ডার ID</th><th>কাস্টমার</th><th>মোট</th><th>স্ট্যাটাস</th><th></th></tr>
+    ${orders.map(o=>`<tr><td><small>${esc(o.id)}</small><br><small style="color:var(--muted)">${fmtDate(o.createdAt)}</small></td>
+      <td>${esc(o.name)}<br><small>${esc(o.phone)}</small></td><td>৳${Number(o.total)||0}<br><small>${esc(o.pay)}</small></td>
+      <td><select onchange="updateStatus('${esc(o.id)}',this.value)">${STATUSES.map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></td>
+      <td><button class="smallbtn edit" onclick="editOrder('${esc(o.id)}')">বিস্তারিত / কুরিয়ার</button></td></tr>`).join('')}
     </table></div>` : '<p>এখনো কোনো অর্ডার নেই।</p>';
   } else if(adminTab==='analytics'){
-    const totalSales = orders.reduce((s,o)=>s+o.total,0);
+    const validOrders = orders.filter(o=>o.status!=='Cancelled');
+    const totalSales = validOrders.reduce((s,o)=>s+(Number(o.total)||0),0);
     const lowStock = products.filter(p=>p.stock<=5).length;
     const salesByProduct={};
-    orders.forEach(o=>o.items.forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+i.qty; }));
+    validOrders.forEach(o=>(o.items||[]).forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+(Number(i.qty)||0); }));
     const top = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
     body.innerHTML = `<div class="statgrid">
         <div class="stat"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
-        <div class="stat"><div class="statnum">${orders.length}</div><div class="statlabel">মোট অর্ডার</div></div>
+        <div class="stat"><div class="statnum">${validOrders.length}</div><div class="statlabel">মোট অর্ডার (বাতিল বাদে)</div></div>
         <div class="stat"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
       </div>
       <h3>টপ সেলিং প্রোডাক্ট</h3>
-      ${top.length? '<ol>'+top.map(([n,q])=>`<li>${n} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
+      ${top.length? '<ol>'+top.map(([n,q])=>`<li>${esc(n)} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
   }
 }
-async function updateStatus(id, status){ await db.collection('orders').doc(id).update({status}); }
+const STATUSES = ['Pending','Confirmed','Shipped','Delivered','Cancelled'];
+const STATUS_LABEL = {Pending:'অর্ডার পেয়েছি',Confirmed:'কনফার্মড',Shipped:'কুরিয়ারে পাঠানো হয়েছে',Delivered:'ডেলিভারড',Cancelled:'বাতিল'};
+const COURIERS = ['Pathao','Steadfast','RedX','Paperfly','eCourier','Sundarban Courier','SA Paribahan','Janani Express','নিজস্ব ডেলিভারি','Other'];
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(ts){
+  if(!ts || !ts.toDate) return '';
+  return ts.toDate().toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function intlPhone(p){
+  const d = String(p||'').replace(/\D/g,'');
+  if(d.startsWith('880')) return d;
+  if(d.startsWith('0')) return '88'+d;
+  return '88'+d;
+}
+function statusPatch(o, status){
+  if(o.status===status) return {};
+  return { status, history: firebase.firestore.FieldValue.arrayUnion({status, at: Date.now()}) };
+}
+async function restockOrder(o){
+  if(!confirm('অর্ডারটি বাতিল করা হলো। প্রোডাক্টের স্টক ফেরত যোগ করবেন?')) return;
+  for(const it of (o.items||[])){
+    try{ await db.collection('products').doc(it.id).update({ stock: firebase.firestore.FieldValue.increment(Number(it.qty)||0), sold: firebase.firestore.FieldValue.increment(-(Number(it.qty)||0)) }); }catch(e){ console.warn(e); }
+  }
+}
+async function updateStatus(id, status){
+  const o = orders.find(x=>x.id===id); if(!o) return;
+  const patch = statusPatch(o, status);
+  if(!Object.keys(patch).length) return;
+  await db.collection('orders').doc(id).update(patch);
+  if(status==='Cancelled') await restockOrder(o);
+}
+function editOrder(id){
+  const o = orders.find(x=>x.id===id); if(!o) return;
+  const items = (o.items||[]).map(i=>`<li>${esc(i.name)} × ${Number(i.qty)||0} = ৳${(Number(i.price)||0)*(Number(i.qty)||0)}</li>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button>
+    <h2>অর্ডার ${esc(o.id)}</h2>
+    <p style="font-size:13px;line-height:1.6"><b>${esc(o.name)}</b> · ${esc(o.phone)}<br>📍 ${esc(o.addr)}<br>💳 ${esc(o.pay)} · মোট ৳${Number(o.total)||0}<br><small>${fmtDate(o.createdAt)}</small></p>
+    <ul class="features-list">${items}</ul>
+    <label>স্ট্যাটাস</label>
+    <select id="oStatus">${STATUSES.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s} — ${STATUS_LABEL[s]}</option>`).join('')}</select>
+    <label>কুরিয়ারের নাম</label>
+    <select id="oCourier"><option value="">— নির্বাচন করুন —</option>${COURIERS.map(c=>`<option ${o.courier===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <label>ট্র্যাকিং / Consignment নম্বর</label><input id="oTrackId" value="${esc(o.trackingId||'')}">
+    <label>কুরিয়ারের ট্র্যাকিং লিংক (ঐচ্ছিক)</label><input id="oTrackUrl" value="${esc(o.trackingUrl||'')}" placeholder="https://...">
+    <label>বর্তমান অবস্থা / লোকেশন (যেমন: ঢাকা হাবে পৌঁছেছে)</label><input id="oNote" value="${esc(o.trackingNote||'')}">
+    <label>সম্ভাব্য ডেলিভারি তারিখ</label><input id="oEta" type="date" value="${esc(o.estDelivery||'')}">
+    <button class="primary" style="width:100%;margin-bottom:8px" onclick="saveOrder('${esc(o.id)}')">সেভ করুন</button>
+    <button class="secondary" style="width:100%" onclick="whatsappCustomer('${esc(o.id)}')">📲 কাস্টমারকে WhatsApp এ জানান</button>`);
+}
+async function saveOrder(id){
+  const o = orders.find(x=>x.id===id); if(!o) return;
+  const status = document.getElementById('oStatus').value;
+  const trackingUrl = document.getElementById('oTrackUrl').value.trim();
+  if(trackingUrl && !/^https?:\/\//i.test(trackingUrl)){ alert('ট্র্যাকিং লিংক http:// বা https:// দিয়ে শুরু হতে হবে'); return; }
+  const patch = Object.assign(statusPatch(o,status), {
+    courier: document.getElementById('oCourier').value,
+    trackingId: document.getElementById('oTrackId').value.trim(),
+    trackingUrl,
+    trackingNote: document.getElementById('oNote').value.trim(),
+    estDelivery: document.getElementById('oEta').value
+  });
+  await db.collection('orders').doc(id).update(patch);
+  if(status==='Cancelled' && o.status!=='Cancelled') await restockOrder(o);
+  closeSheet();
+}
+function whatsappCustomer(id){
+  const o = orders.find(x=>x.id===id); if(!o) return;
+  const site = location.href.replace(/admin\.html.*$/,'');
+  const lines = [`Baby Poshak: আপনার অর্ডার ${o.id} এর অবস্থা — ${STATUS_LABEL[o.status]||o.status}`];
+  if(o.courier) lines.push(`কুরিয়ার: ${o.courier}`);
+  if(o.trackingId) lines.push(`ট্র্যাকিং নম্বর: ${o.trackingId}`);
+  if(o.trackingNote) lines.push(`আপডেট: ${o.trackingNote}`);
+  if(o.estDelivery) lines.push(`সম্ভাব্য ডেলিভারি: ${o.estDelivery}`);
+  lines.push(`অর্ডার ট্র্যাক করুন: ${site}`);
+  window.open('https://wa.me/'+intlPhone(o.phone)+'?text='+encodeURIComponent(lines.join('\n')));
+}
 function editProduct(id){
   const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
