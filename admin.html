@@ -128,7 +128,10 @@ th{background:var(--border);}
 <body>
 <header>
   <h1>🛠 Baby Poshak Admin</h1>
-  <a href="index.html" class="navicon" style="text-decoration:none"><span class="ic">🛍</span><small>দোকান দেখুন</small></a>
+  <div class="navicons">
+    <a href="index.html" class="navicon" style="text-decoration:none"><span class="ic">🛍</span><small>দোকান দেখুন</small></a>
+    <div class="navicon hidden" id="logoutBtn" onclick="auth.signOut()"><span class="ic">🚪</span><small>লগআউট</small></div>
+  </div>
 </header>
 <main>
   <div id="adminView"></div>
@@ -203,6 +206,7 @@ function closeSheet(){ const ov=document.getElementById('sheetOverlay'); if(ov) 
 // ---------- ADMIN ----------
 let adminTab='products';
 function renderAdmin(){
+  const lb = document.getElementById('logoutBtn'); if(lb) lb.classList.toggle('hidden', !isAdmin);
   const el = document.getElementById('adminView');
   if(!isAdmin){
     el.innerHTML = `<div class="card" style="max-width:340px;margin:30px auto;">
@@ -214,7 +218,7 @@ function renderAdmin(){
     </div>`;
     return;
   }
-  el.innerHTML = `<div style="text-align:right;margin-bottom:8px"><button class="secondary" onclick="auth.signOut()">লগআউট</button></div>
+  el.innerHTML = `
     <div class="subtabs">
       <button class="${adminTab==='products'?'active':''}" onclick="setAdminTab('products')">📦 প্রোডাক্ট</button>
       <button class="${adminTab==='orders'?'active':''}" onclick="setAdminTab('orders')">🧾 অর্ডার</button>
