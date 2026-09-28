@@ -21,18 +21,6 @@ header h1{margin:0;font-size:20px;cursor:pointer;}
 .navicon{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px;color:#fff;position:relative;}
 .navicon span.ic{font-size:18px;}
 .navbadge{position:absolute;top:-6px;right:-10px;background:#fff;color:var(--pink-dark);border-radius:10px;font-size:10px;font-weight:800;padding:1px 5px;}
-.navwrap{position:sticky;top:62px;z-index:9;background:var(--card);border-bottom:1px solid var(--border);}
-.categorynav{display:flex;overflow-x:auto;padding:0 8px;}
-.navitem{flex-shrink:0;padding:12px 14px;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;}
-.navitem:hover{color:var(--pink-dark);}
-.navitem.active{color:var(--pink-dark);border-bottom-color:var(--pink-dark);}
-.megapanel{display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);box-shadow:0 14px 26px rgba(0,0,0,.2);max-height:70vh;overflow-y:auto;z-index:50;padding:18px 24px 20px;border-top:1px solid var(--border);}
-.megapanel.open{display:block;}
-.megahead{color:var(--pink-dark);font-weight:800;font-size:13px;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px;}
-.megagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 28px;}
-.megaitem{padding:8px 0;font-size:14px;cursor:pointer;}
-.megaitem:hover{color:var(--pink-dark);font-weight:600;}
-.megaview{margin-top:14px;color:var(--pink-dark);font-weight:700;font-size:13px;cursor:pointer;}
 .megaoverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:45;}
 .megaoverlay.open{display:block;}
 .tabbtn{background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;}
@@ -118,6 +106,11 @@ th{background:var(--border);}
 .sidebar-link.active{background:var(--pink);color:#fff;}
 .sidebar-link .cnt{color:var(--muted);font-size:11px;}
 .sidebar-link.active .cnt{color:#fff;}
+.sidebar-subs{margin:2px 0 8px 10px;border-left:2px solid var(--border);padding-left:6px;}
+.sidebar-sub{display:flex;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px;}
+.sidebar-sub:hover{background:var(--border);}
+.sidebar-sub.active{color:var(--pink-dark);font-weight:700;background:var(--border);}
+.sidebar-sub .cnt{color:var(--muted);font-size:11px;}
 .storecontent{flex:1;min-width:0;}
 .searchbar{position:relative;margin-bottom:14px;}
 .searchbar input{padding:12px 12px 12px 38px;border-radius:10px;margin:0;}
@@ -148,7 +141,6 @@ th{background:var(--border);}
     <div class="navicon" onclick="openCart()"><span class="ic">🛍</span><small>Bag</small><span class="navbadge" id="cartCount2">0</span></div>
   </div>
 </header>
-<div class="navwrap"><nav class="categorynav" id="categoryNav"></nav><div class="megapanel" id="megaPanel"></div></div>
 <main>
   <div id="storeView"></div>
 </main>
@@ -243,6 +235,7 @@ function getFilteredProducts(){
 function renderStore(){
   const el = document.getElementById('storeView');
   const catCount = c => products.filter(p=>p.category===c).length;
+  const subCount = (c,sub) => products.filter(p=>p.category===c && (p.subcategory||'').toLowerCase().includes(sub.toLowerCase())).length;
   const sidebarLink = (key,label,cnt) => `<div class="sidebar-link ${filterCat===key?'active':''}" onclick="setFilterCat('${key}')">
       <span>${label}</span>${cnt!=null?`<span class="cnt">${cnt}</span>`:''}
     </div>`;
@@ -257,7 +250,7 @@ function renderStore(){
         ${sidebarLink('TopSelling','⭐ Top Selling')}
         ${sidebarLink('FreeDelivery','🚚 Free Delivery')}
         <h4>Category</h4>
-        ${CATEGORIES.map(c=>sidebarLink(c,c,catCount(c))).join('')}
+        ${CATEGORIES.map((c,i)=>sidebarLink(c,c,catCount(c)) + (filterCat===c ? `<div class="sidebar-subs">${(SUBCATS[c]||[]).map((sub,j)=>`<div class="sidebar-sub ${filterSubcat===sub?'active':''}" onclick="setSub(${i},${j})"><span>${sub}</span><span class="cnt">${subCount(c,sub)}</span></div>`).join('')}</div>` : '')).join('')}
         <h4>Age</h4>
         <select id="ageFilterSel" onchange="setFilterAge(this.value)">
           <option value="All" ${filterAge==='All'?'selected':''}>সব বয়স</option>
@@ -308,38 +301,11 @@ function renderProductGrid(){
   updateCartCount();
 }
 function toggleSidebar(){ document.getElementById('sidebarPanel').classList.toggle('open'); }
-let openMega = -1;
-function buildCategoryNav(){
-  const nav = document.getElementById('categoryNav');
-  nav.innerHTML = CATEGORIES.map((c,i)=>`<div class="navitem" id="navitem-${i}" onclick="toggleMegaMenu(${i})">${c}</div>`).join('');
-}
-function toggleMegaMenu(i){
-  if(openMega===i){ closeMega(); return; }
-  openMega = i;
+function setSub(i,j){
   const c = CATEGORIES[i];
-  const panel = document.getElementById('megaPanel');
-  panel.innerHTML = `<div class="megahead">${c}</div>
-    <div class="megagrid">${(SUBCATS[c]||[]).map((s,j)=>`<div class="megaitem" onclick="goToSubcatIdx(${i},${j})">${s}</div>`).join('')}</div>
-    <div class="megaview" onclick="viewAllCat(${i})">View All ${c} →</div>`;
-  panel.classList.add('open');
-  document.querySelectorAll('.navitem').forEach((el,idx)=>el.classList.toggle('active', idx===i));
+  filterCat = c; filterSubcat = SUBCATS[c][j]; searchQuery = '';
+  renderStore();
 }
-function closeMega(){
-  openMega = -1;
-  const panel = document.getElementById('megaPanel'); if(panel) panel.classList.remove('open');
-  document.querySelectorAll('.navitem').forEach(el=>el.classList.remove('active'));
-}
-document.addEventListener('click', e=>{ if(!e.target.closest('.navwrap')) closeMega(); });
-function goToSubcatIdx(i,j){
-  const c = CATEGORIES[i];
-  filterCat = c; filterSubcat = SUBCATS[c][j]; searchQuery='';
-  closeMega(); showView('store');
-}
-function viewAllCat(i){
-  filterCat = CATEGORIES[i]; filterSubcat = 'All'; searchQuery='';
-  closeMega(); showView('store');
-}
-buildCategoryNav();
 function setSearchQuery(v){ searchQuery=v; renderProductGrid(); }
 function setFilterCat(c){ filterCat=c; filterSubcat='All'; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
