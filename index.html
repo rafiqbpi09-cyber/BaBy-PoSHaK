@@ -432,11 +432,12 @@ async function placeOrder(){
   }
   const msg = encodeURIComponent(`নতুন অর্ডার - Baby Poshak\nঅর্ডার ID: ${orderId}\nনাম: ${name}\nমোবাইল: ${phone}\nঠিকানা: ${addr}\nপেমেন্ট: ${pay}\n${items.map(i=>`- ${i.name} x${i.qty} = ৳${i.price*i.qty}`).join('\n')}\nমোট: ৳${total}`);
   cart={}; updateCartCount();
+  try{ window.open('https://wa.me/'+BUSINESS_PHONE+'?text='+msg, '_blank'); }catch(e){}
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🎉 অর্ডার সফল হয়েছে!</h2>
     <p>আপনার অর্ডার ID: <b style="font-size:18px">${orderId}</b><br><small>এটা সংরক্ষণ করুন — এই ID দিয়ে যেকোনো সময় অর্ডার ট্র্যাক করতে পারবেন।</small></p>
     <p>মোট: <b>৳${total}</b></p>
     <button class="primary" style="width:100%;margin-bottom:8px" onclick="openOrder('${orderId}')">📦 অর্ডার ট্র্যাক করুন</button>
-    <a class="secondary" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="https://wa.me/${BUSINESS_PHONE}?text=${msg}" target="_blank">📲 WhatsApp এ কনফার্ম করুন</a>
+    <a class="secondary" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="https://wa.me/${BUSINESS_PHONE}?text=${msg}" target="_blank">📲 WhatsApp না খুললে এখানে চাপুন</a>
     <button class="secondary" style="width:100%" onclick="closeSheet();">ঠিক আছে</button>`);
 }
 // ---------- ORDER TRACKING ----------

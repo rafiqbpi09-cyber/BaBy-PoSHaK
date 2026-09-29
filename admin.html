@@ -133,6 +133,9 @@ th{background:var(--border);}
     <div class="navicon hidden" id="logoutBtn" onclick="auth.signOut()"><span class="ic">🚪</span><small>লগআউট</small></div>
   </div>
 </header>
+<div class="hidden" id="newOrderBanner" style="background:#2bb673;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="this.classList.add('hidden');adminTab='orders';renderAdmin();">
+  <span></span><span>✕</span>
+</div>
 <main>
   <div id="adminView"></div>
 </main>
@@ -183,10 +186,34 @@ db.collection('products').onSnapshot(snap=>{
   if(isAdmin && adminTab==='products') renderAdminBody();
 });
 let unsubOrders = null;
+let firstOrderLoad = true;
+function beep(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; g.gain.value = 0.15;
+    o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 300);
+  }catch(e){}
+}
+function notifyNewOrder(o){
+  beep();
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification('🛒 নতুন অর্ডার এসেছে!', { body: `${o.name} — ৳${o.total}`, tag: o.id }); }catch(e){}
+  }
+  const banner = document.getElementById('newOrderBanner');
+  if(banner){ banner.classList.remove('hidden'); banner.querySelector('span').textContent = `🛒 নতুন অর্ডার: ${o.name} — ৳${o.total}`; }
+}
 auth.onAuthStateChanged(u=>{
   isAdmin = !!u;
   if(u && !unsubOrders){
+    if('Notification' in window && Notification.permission==='default'){ Notification.requestPermission(); }
+    firstOrderLoad = true;
     unsubOrders = db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap=>{
+      if(!firstOrderLoad){
+        snap.docChanges().forEach(ch=>{ if(ch.type==='added') notifyNewOrder({id:ch.doc.id, ...ch.doc.data()}); });
+      }
+      firstOrderLoad = false;
       orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
       if(isAdmin && (adminTab==='orders'||adminTab==='analytics')) renderAdminBody();
     });
