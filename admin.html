@@ -187,6 +187,8 @@ db.collection('products').onSnapshot(snap=>{
   products = snap.docs.map(d=>({id:d.id, ...d.data()}));
   if(isAdmin && adminTab==='products') renderAdminBody();
 });
+let memos = [];
+let unsubMemos = null;
 let unsubOrders = null;
 let firstOrderLoad = true;
 function beep(){
@@ -221,6 +223,13 @@ auth.onAuthStateChanged(u=>{
     });
   }
   if(!u && unsubOrders){ unsubOrders(); unsubOrders = null; orders = []; }
+  if(u && !unsubMemos){
+    unsubMemos = db.collection('memos').orderBy('createdAt','desc').onSnapshot(snap=>{
+      memos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      if(isAdmin && adminTab==='memo') renderMemoTab(document.getElementById('adminBody'));
+    });
+  }
+  if(!u && unsubMemos){ unsubMemos(); unsubMemos = null; memos = []; }
   renderAdmin();
 });
 
@@ -252,6 +261,7 @@ function renderAdmin(){
       <button class="${adminTab==='products'?'active':''}" onclick="setAdminTab('products')">📦 প্রোডাক্ট</button>
       <button class="${adminTab==='orders'?'active':''}" onclick="setAdminTab('orders')">🧾 অর্ডার</button>
       <button class="${adminTab==='analytics'?'active':''}" onclick="setAdminTab('analytics')">📊 রিপোর্ট</button>
+      <button class="${adminTab==='memo'?'active':''}" onclick="setAdminTab('memo')">🧾 Memo</button>
     </div>
     <div id="adminBody"></div>`;
   renderAdminBody();
@@ -279,20 +289,90 @@ function renderAdminBody(){
       <td><button class="smallbtn edit" onclick="editOrder('${esc(o.id)}')">বিস্তারিত / কুরিয়ার</button></td></tr>`).join('')}
     </table></div>` : '<p>এখনো কোনো অর্ডার নেই।</p>';
   } else if(adminTab==='analytics'){
+    renderReportsTab(body);
+  } else if(adminTab==='memo'){
+    renderMemoTab(body);
+  }
+}
+function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+function orderMs(o){ return o.createdAt && o.createdAt.toMillis ? o.createdAt.toMillis() : 0; }
+function isToday(ms){ return ms >= startOfToday(); }
+function deliveredToday(o){ return (o.history||[]).some(h=>h.status==='Delivered' && h.at>=startOfToday()); }
+function renderReportsTab(body){
     const validOrders = orders.filter(o=>o.status!=='Cancelled');
     const totalSales = validOrders.reduce((s,o)=>s+(Number(o.total)||0),0);
-    const lowStock = products.filter(p=>p.stock<=5).length;
+    const totalProducts = products.length;
+    const totalStockItems = products.reduce((s,p)=>s+(Number(p.stock)||0),0);
+    const lowStock = products.filter(p=>p.stock>0 && p.stock<=5).length;
+    const outOfStock = products.filter(p=>(p.stock||0)<=0).length;
+    const todaysOrders = validOrders.filter(o=>isToday(orderMs(o)));
+    const todaysDeliveredOrders = orders.filter(deliveredToday);
+    const todaysDeliveryQty = todaysDeliveredOrders.reduce((s,o)=>s+(o.items||[]).reduce((a,i)=>a+(Number(i.qty)||0),0),0);
+    const stockValue = products.reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.purchasePrice)||0),0);
     const salesByProduct={};
     validOrders.forEach(o=>(o.items||[]).forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+(Number(i.qty)||0); }));
     const top = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
     body.innerHTML = `<div class="statgrid">
+        <div class="stat"><div class="statnum">${totalProducts}</div><div class="statlabel">Total My Shop Product</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showStockItemsDetail()"><div class="statnum">${totalStockItems}</div><div class="statlabel">📦 Total Stock Items</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showLowStockDetail()"><div class="statnum">${lowStock}</div><div class="statlabel">⚠️ Low Stock Items</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showOutOfStockDetail()"><div class="statnum">${outOfStock}</div><div class="statlabel">🚫 Out of Stock</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showTodaysOrdersDetail()"><div class="statnum">${todaysOrders.length}</div><div class="statlabel">🧾 Today's Order Received</div></div>
+        <div class="stat"><div class="statnum">${todaysDeliveryQty}</div><div class="statlabel">💰 Today's Delivery Quantity</div></div>
         <div class="stat" style="cursor:pointer" onclick="showSalesDetail()"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
         <div class="stat" style="cursor:pointer" onclick="showOrdersDetail()"><div class="statnum">${validOrders.length}</div><div class="statlabel">মোট অর্ডার (বাতিল বাদে)</div></div>
-        <div class="stat" style="cursor:pointer" onclick="showLowStockDetail()"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
+        <div class="stat"><div class="statnum">৳${stockValue.toFixed(2)}</div><div class="statlabel">📊 Total Stock Value</div></div>
       </div>
-      <h3>টপ সেলিং প্রোডাক্ট</h3>
+      <h3 style="margin-top:18px">প্রফিট রিপোর্ট</h3>
+      <div class="subtabs" id="profitTabs">
+        ${['today','weekly','monthly','yearly'].map(r=>`<button class="${profitRange===r?'active':''}" onclick="setProfitRange('${r}')">${{today:'Today',weekly:'Weekly',monthly:'Monthly',yearly:'Yearly'}[r]}</button>`).join('')}
+      </div>
+      <div id="profitBox"></div>
+      <h3 style="margin-top:18px">টপ সেলিং প্রোডাক্ট</h3>
       ${top.length? '<ol>'+top.map(([n,q])=>`<li>${esc(n)} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
-  }
+    renderProfitBox();
+}
+let profitRange = 'today';
+function setProfitRange(r){ profitRange=r; document.querySelectorAll('#profitTabs button').forEach((b,i)=>b.classList.toggle('active', ['today','weekly','monthly','yearly'][i]===r)); renderProfitBox(); }
+function productCost(id){ const p = products.find(x=>x.id===id); return p ? (Number(p.purchasePrice)||0) : 0; }
+function orderProfit(o){ return (o.items||[]).reduce((s,i)=>s+((Number(i.price)||0)-productCost(i.id))*(Number(i.qty)||0), 0); }
+function rangeStartMs(r){
+  const d = new Date(); d.setHours(0,0,0,0);
+  if(r==='today') return d.getTime();
+  if(r==='weekly'){ d.setDate(d.getDate()-6); return d.getTime(); }
+  if(r==='monthly'){ d.setDate(d.getDate()-29); return d.getTime(); }
+  if(r==='yearly'){ d.setFullYear(d.getFullYear()-1); return d.getTime(); }
+  return d.getTime();
+}
+function renderProfitBox(){
+  const box = document.getElementById('profitBox'); if(!box) return;
+  const valid = orders.filter(o=>o.status!=='Cancelled');
+  const start = rangeStartMs(profitRange);
+  const inRange = valid.filter(o=>orderMs(o)>=start);
+  const totalProfit = inRange.reduce((s,o)=>s+orderProfit(o), 0);
+  const byDate = {};
+  inRange.forEach(o=>{ const key = o.createdAt&&o.createdAt.toDate ? o.createdAt.toDate().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'অজানা'; byDate[key]=(byDate[key]||0)+orderProfit(o); });
+  const dateRows = Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0]));
+  box.innerHTML = `<div class="statgrid" style="grid-template-columns:1fr;max-width:260px;margin-bottom:12px">
+      <div class="stat"><div class="statnum">৳${totalProfit.toFixed(2)}</div><div class="statlabel">${{today:'Today',weekly:'Weekly',monthly:'Monthly',yearly:'Yearly'}[profitRange]} Profit</div></div>
+    </div>
+    ${profitRange==='today' ? '' : `<div class="overflow-x"><table><tr><th>তারিখ</th><th>প্রফিট</th></tr>
+      ${dateRows.map(([d,v])=>`<tr><td>${d}</td><td>৳${v.toFixed(2)}</td></tr>`).join('') || '<tr><td colspan="2">কোনো ডেটা নেই</td></tr>'}
+    </table></div>`}
+    <p class="note">প্রফিট হিসাব হয় বর্তমান Purchase Price দিয়ে, তাই প্রোডাক্টের কেনা দাম পরে বদলালে পুরনো অর্ডারের প্রফিটও নতুন দামে হিসাব হবে।</p>`;
+}
+function showStockItemsDetail(){
+  const rows = products.filter(p=>(p.stock||0)>0).sort((a,b)=>b.stock-a.stock).map(p=>`<div class="cartrow"><div>${esc(p.name)}</div><div>${p.stock} পিস</div></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>📦 Total Stock Items</h2>${rows || '<p class="note">কোনো স্টক নেই।</p>'}`);
+}
+function showOutOfStockDetail(){
+  const rows = products.filter(p=>(p.stock||0)<=0).map(p=>`<div class="cartrow" style="cursor:pointer" onclick="closeSheet();editProduct('${p.id}')"><div>${esc(p.name)}</div><div style="color:#c92a2a;font-weight:700">স্টক শেষ</div></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🚫 Out of Stock</h2>${rows || '<p class="note">কোনো আইটেম স্টক-আউট নেই।</p>'}`);
+}
+function showTodaysOrdersDetail(){
+  const rows = orders.filter(o=>o.status!=='Cancelled' && isToday(orderMs(o))).map(o=>`<div class="ordercard" onclick="closeSheet();adminTab='orders';renderAdmin();editOrder('${esc(o.id)}')">
+      <b>${esc(o.id)}</b> · ${esc(o.name)} · ৳${Number(o.total)||0}<br><small>${fmtDate(o.createdAt)}</small></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🧾 আজকের অর্ডার</h2>${rows || '<p class="note">আজ এখনো কোনো অর্ডার আসেনি।</p>'}`);
 }
 const STATUSES = ['Pending','Confirmed','Shipped','Delivered','Cancelled'];
 const STATUS_LABEL = {Pending:'অর্ডার পেয়েছি',Confirmed:'কনফার্মড',Shipped:'কুরিয়ারে পাঠানো হয়েছে',Delivered:'ডেলিভারড',Cancelled:'বাতিল'};
@@ -394,8 +474,147 @@ function whatsappCustomer(id){
   lines.push(`অর্ডার ট্র্যাক করুন: ${site}`);
   window.open('https://wa.me/'+intlPhone(o.phone)+'?text='+encodeURIComponent(lines.join('\n')));
 }
+// ---------- MEMO ----------
+let memoSubTab = 'create';
+let memoDraftItems = [];
+let memoSearch = '';
+function genMemoNo(){
+  const chars = '0123456789';
+  const arr = new Uint32Array(6); crypto.getRandomValues(arr);
+  return 'M' + Array.from(arr, n=>chars[n % chars.length]).join('');
+}
+function renderMemoTab(body){
+  if(!body) return;
+  body.innerHTML = `
+    <div class="subtabs">
+      <button class="${memoSubTab==='create'?'active':''}" onclick="setMemoSubTab('create')">🧾 Create Memo</button>
+      <button class="${memoSubTab==='drafts'?'active':''}" onclick="setMemoSubTab('drafts')">🟡 Saved/Draft Memos</button>
+      <button class="${memoSubTab==='history'?'active':''}" onclick="setMemoSubTab('history')">📜 Memo History</button>
+    </div>
+    <div id="memoBody"></div>`;
+  renderMemoBody();
+}
+function setMemoSubTab(t){ memoSubTab=t; if(t==='create') memoDraftItems=[]; renderMemoBody(); }
+function renderMemoBody(){
+  const el = document.getElementById('memoBody'); if(!el) return;
+  if(memoSubTab==='create'){
+    renderMemoCreate(el);
+  } else {
+    const list = memos.filter(m=> memoSubTab==='drafts' ? m.status==='draft' : m.status==='final');
+    el.innerHTML = `
+      <input id="memoSearchBox" placeholder="🔎 Memo নম্বর বা কাস্টমারের নাম দিয়ে খুঁজুন" value="${esc(memoSearch)}" oninput="setMemoSearch(this.value)">
+      <div id="memoListBox"></div>`;
+    document.getElementById('memoListBox').innerHTML = renderMemoList(list);
+  }
+}
+function setMemoSearch(v){ memoSearch=v; const box=document.getElementById('memoListBox'); if(!box) return;
+  const list = memos.filter(m=> memoSubTab==='drafts' ? m.status==='draft' : m.status==='final');
+  box.innerHTML = renderMemoList(list);
+}
+function renderMemoList(list){
+  const q = memoSearch.trim().toLowerCase();
+  const filtered = q ? list.filter(m=>(m.memoNo||'').toLowerCase().includes(q) || (m.customerName||'').toLowerCase().includes(q)) : list;
+  if(!filtered.length) return '<p class="note">কোনো মেমো পাওয়া যায়নি।</p>';
+  return filtered.map(m=>`<div class="ordercard" onclick="openMemo('${m.id}')">
+      <b>${esc(m.memoNo)}</b> ${m.status==='draft'?'<span class="stbadge Cancelled" style="background:#fff3cd;color:#856404">Draft</span>':'<span class="stbadge">Final</span>'}<br>
+      <small>${esc(m.customerName||'ওয়াক-ইন কাস্টমার')} · ৳${Number(m.total)||0} · ${fmtDate(m.createdAt)}</small></div>`).join('');
+}
+function renderMemoCreate(el){
+  const total = memoDraftItems.reduce((s,i)=>s+i.price*i.qty,0);
+  el.innerHTML = `
+    <label>প্রোডাক্ট যোগ করুন</label>
+    <select id="memoProdSelect">
+      <option value="">— প্রোডাক্ট বেছে নিন —</option>
+      ${products.map(p=>`<option value="${p.id}">${esc(p.name)} (স্টক: ${p.stock}, ৳${p.price})</option>`).join('')}
+    </select>
+    <button class="secondary" style="margin-bottom:14px" onclick="addMemoItem()">+ যোগ করুন</button>
+    ${memoDraftItems.length ? `<div class="overflow-x"><table><tr><th>প্রোডাক্ট</th><th>দাম</th><th>পরিমাণ</th><th>সাবটোটাল</th><th></th></tr>
+      ${memoDraftItems.map((i,idx)=>`<tr><td>${esc(i.name)}</td><td>৳${i.price}</td>
+        <td><input type="number" min="1" value="${i.qty}" style="width:70px;margin:0" onchange="setMemoQty(${idx},this.value)"></td>
+        <td>৳${(i.price*i.qty).toFixed(2)}</td>
+        <td><button class="smallbtn del" onclick="removeMemoItem(${idx})">✕</button></td></tr>`).join('')}
+      </table></div>` : '<p class="note">এখনো কোনো প্রোডাক্ট যোগ করা হয়নি।</p>'}
+    <div class="total">মোট: ৳${total.toFixed(2)}</div>
+    <label>কাস্টমারের নাম (ঐচ্ছিক)</label><input id="memoCustName" placeholder="ওয়াক-ইন কাস্টমার">
+    <label>মোবাইল নম্বর (ঐচ্ছিক)</label><input id="memoCustPhone" placeholder="01XXXXXXXXX">
+    <div class="btnrow" style="gap:8px">
+      <button class="secondary" style="flex:1" onclick="saveMemo('draft')">🟡 Draft হিসেবে সেভ করুন</button>
+      <button class="primary" style="flex:1" onclick="saveMemo('final')">✅ Memo ফাইনাল করুন (স্টক কমবে)</button>
+    </div>`;
+}
+function addMemoItem(){
+  const sel = document.getElementById('memoProdSelect');
+  const id = sel.value; if(!id) return;
+  const p = products.find(x=>x.id===id); if(!p) return;
+  const existing = memoDraftItems.find(i=>i.id===id);
+  if(existing) existing.qty += 1;
+  else memoDraftItems.push({id, name:p.name, price:Number(p.price)||0, qty:1});
+  renderMemoCreate(document.getElementById('memoBody'));
+}
+function setMemoQty(idx, val){ memoDraftItems[idx].qty = Math.max(1, parseInt(val)||1); renderMemoCreate(document.getElementById('memoBody')); }
+function removeMemoItem(idx){ memoDraftItems.splice(idx,1); renderMemoCreate(document.getElementById('memoBody')); }
+async function saveMemo(status){
+  if(!memoDraftItems.length){ alert('কমপক্ষে একটা প্রোডাক্ট যোগ করুন'); return; }
+  const total = memoDraftItems.reduce((s,i)=>s+i.price*i.qty,0);
+  const data = {
+    memoNo: genMemoNo(),
+    items: memoDraftItems,
+    total,
+    customerName: document.getElementById('memoCustName').value.trim(),
+    customerPhone: document.getElementById('memoCustPhone').value.trim(),
+    status,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  if(status==='final'){
+    for(const it of memoDraftItems){
+      try{ await db.collection('products').doc(it.id).update({ stock: firebase.firestore.FieldValue.increment(-it.qty), sold: firebase.firestore.FieldValue.increment(it.qty) }); }catch(e){ console.warn(e); }
+    }
+  }
+  await db.collection('memos').add(data);
+  memoDraftItems = [];
+  alert(status==='final' ? 'Memo ফাইনাল হয়েছে ও স্টক আপডেট হয়েছে' : 'Draft হিসেবে সেভ হয়েছে');
+  setMemoSubTab(status==='final' ? 'history' : 'drafts');
+}
+function openMemo(id){
+  const m = memos.find(x=>x.id===id); if(!m) return;
+  const items = (m.items||[]).map(i=>`<li>${esc(i.name)} × ${i.qty} = ৳${(i.price*i.qty).toFixed(2)}</li>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button>
+    <h2>${esc(m.memoNo)} ${m.status==='draft'?'(Draft)':'(Final)'}</h2>
+    <p style="font-size:13px">👤 ${esc(m.customerName||'ওয়াক-ইন কাস্টমার')} ${m.customerPhone?'· '+esc(m.customerPhone):''}<br><small>${fmtDate(m.createdAt)}</small></p>
+    <ul class="features-list">${items}</ul>
+    <div class="total">মোট: ৳${Number(m.total)||0}</div>
+    ${m.status==='draft' ? `
+      <button class="primary" style="width:100%;margin-bottom:8px" onclick="finalizeMemo('${m.id}')">✅ ফাইনাল করুন (স্টক কমবে)</button>
+      <button class="secondary" style="width:100%;margin-bottom:8px" onclick="deleteMemo('${m.id}')">🗑️ ডিলিট করুন</button>
+    ` : `<button class="secondary" style="width:100%;margin-bottom:8px" onclick="printMemo('${m.id}')">🖨️ প্রিন্ট</button>`}
+    <button class="secondary" style="width:100%" onclick="closeSheet()">বন্ধ করুন</button>`);
+}
+async function finalizeMemo(id){
+  const m = memos.find(x=>x.id===id); if(!m) return;
+  for(const it of (m.items||[])){
+    try{ await db.collection('products').doc(it.id).update({ stock: firebase.firestore.FieldValue.increment(-it.qty), sold: firebase.firestore.FieldValue.increment(it.qty) }); }catch(e){ console.warn(e); }
+  }
+  await db.collection('memos').doc(id).update({ status:'final', finalizedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  closeSheet();
+}
+async function deleteMemo(id){
+  if(!confirm('এই ড্রাফট মেমোটি ডিলিট করবেন?')) return;
+  await db.collection('memos').doc(id).delete();
+  closeSheet();
+}
+function printMemo(id){
+  const m = memos.find(x=>x.id===id); if(!m) return;
+  const w = window.open('', '_blank'); if(!w) return;
+  const rows = (m.items||[]).map(i=>`<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>৳${i.price}</td><td>৳${(i.price*i.qty).toFixed(2)}</td></tr>`).join('');
+  w.document.write(`<html><head><title>${esc(m.memoNo)}</title></head><body style="font-family:sans-serif;padding:20px">
+    <h2>Baby Poshak</h2><p>Memo: <b>${esc(m.memoNo)}</b><br>Date: ${fmtDate(m.createdAt)}<br>Customer: ${esc(m.customerName||'Walk-in')}</p>
+    <table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>${rows}</table>
+    <h3>Total: ৳${Number(m.total)||0}</h3>
+    <script>window.print()<\/script></body></html>`);
+  w.document.close();
+}
 function editProduct(id){
-  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
+  const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,purchasePrice:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
     <label>নাম</label><input id="pName" value="${p.name}">
     <label>Image URL</label>
@@ -403,7 +622,8 @@ function editProduct(id){
     <input id="pImg" value="${p.imageUrl||''}" placeholder="এখানে Direct link পেস্ট করুন">
     <label>আরও ছবি (গ্যালারি, একাধিক হলে কমা দিয়ে আলাদা করুন — ঐচ্ছিক)</label><input id="pExtraImg" value="${p.extraImages||''}" placeholder="url1, url2, url3">
     <label>ইমোজি/আইকন (ছবি না থাকলে এটা দেখাবে)</label><input id="pEmoji" value="${p.emoji}">
-    <label>দাম (৳)</label><input id="pPrice" type="number" value="${p.price}">
+    <label>Purchase Price / কেনা দাম (৳)</label><input id="pPurchase" type="number" value="${p.purchasePrice||''}">
+    <label>Selling Price / বিক্রয় মূল্য (৳)</label><input id="pPrice" type="number" value="${p.price}">
     <label>আগের দাম (ঐচ্ছিক — ডিসকাউন্ট দেখাতে চাইলে)</label><input id="pOldPrice" type="number" value="${p.originalPrice||''}">
     <label>স্টক</label><input id="pStock" type="number" value="${p.stock}">
     <label>Main Category</label>
@@ -431,6 +651,7 @@ async function saveProduct(id){
   const extraImages=document.getElementById('pExtraImg').value.trim();
   const emoji=document.getElementById('pEmoji').value.trim()||'👶';
   const price=parseFloat(document.getElementById('pPrice').value)||0;
+  const purchasePrice=parseFloat(document.getElementById('pPurchase').value)||0;
   const originalPrice=parseFloat(document.getElementById('pOldPrice').value)||0;
   const stock=parseInt(document.getElementById('pStock').value)||0;
   const category=document.getElementById('pCat').value;
@@ -440,7 +661,7 @@ async function saveProduct(id){
   const features=document.getElementById('pFeatures').value.trim();
   const freeDelivery=document.getElementById('pFreeDel').checked;
   if(!name){ alert('প্রোডাক্টের নাম দিন'); return; }
-  const data = {name,emoji,price,originalPrice,stock,category,subcategory,ageGroup,size,imageUrl,extraImages,features,freeDelivery};
+  const data = {name,emoji,price,purchasePrice,originalPrice,stock,category,subcategory,ageGroup,size,imageUrl,extraImages,features,freeDelivery};
   if(id){ await db.collection('products').doc(id).update(data); }
   else{ data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection('products').add(data); }
   closeSheet();

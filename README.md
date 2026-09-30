@@ -36,6 +36,9 @@ service cloud.firestore {
         && request.resource.data.total is number
         && request.resource.data.items is list && request.resource.data.items.size() <= 50;
     }
+    match /memos/{doc} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
 ```
