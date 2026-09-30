@@ -267,7 +267,7 @@ function renderAdminBody(){
     body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
     <div class="overflow-x"><table><tr><th>ছবি</th><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>বয়স</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
     ${products.map(p=>`<tr><td>${p.imageUrl?`<img src="${p.imageUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">`:p.emoji}</td><td>${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>${p.size||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
-      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">Edit</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">Del</button></td></tr>`).join('')}
+      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">✏️ এডিট</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">🗑️ ডিলিট</button></td></tr>`).join('')}
     </table></div>`;
   } else if(adminTab==='orders'){
     body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>অর্ডার ID</th><th>কাস্টমার</th><th>মোট</th><th>স্ট্যাটাস</th><th></th></tr>
