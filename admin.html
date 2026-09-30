@@ -61,7 +61,7 @@ label{font-size:13px;color:var(--muted);}
 .close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);}
 table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:12px;overflow:hidden;}
 th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--border);}
-th{background:var(--border);}
+th{background:#ffe3ec;color:var(--pink-dark);text-transform:uppercase;font-size:11px;letter-spacing:.4px;}
 .smallbtn{padding:5px 9px;border-radius:6px;border:none;font-size:12px;cursor:pointer;margin-right:4px;}
 .edit{background:var(--accent);color:#083b2c;}
 .del{background:#d9534f;color:#fff;}
@@ -265,9 +265,9 @@ function renderAdminBody(){
   const body = document.getElementById('adminBody'); if(!body) return;
   if(adminTab==='products'){
     body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editProduct(null)">+ নতুন প্রোডাক্ট</button>
-    <div class="overflow-x"><table><tr><th>ছবি</th><th>প্রোডাক্ট</th><th>ক্যাটাগরি</th><th>বয়স</th><th>সাইজ</th><th>দাম</th><th>স্টক</th><th></th></tr>
+    <div class="overflow-x"><table><tr><th>Photo</th><th>Product</th><th>Categories</th><th>Age</th><th>Size</th><th>Price</th><th>Stock</th><th>Edit</th><th>Delete</th></tr>
     ${products.map(p=>`<tr><td>${p.imageUrl?`<img src="${p.imageUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">`:p.emoji}</td><td>${p.name}</td><td>${p.category||''}</td><td>${p.ageGroup||''}</td><td>${p.size||''}</td><td>৳${p.price}</td><td class="${p.stock<=5?'pstock low':''}">${p.stock}</td>
-      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">✏️ এডিট</button><button class="smallbtn del" onclick="deleteProduct('${p.id}')">🗑️ ডিলিট</button></td></tr>`).join('')}
+      <td><button class="smallbtn edit" onclick="editProduct('${p.id}')">✏️ এডিট</button></td><td><button class="smallbtn del" onclick="deleteProduct('${p.id}')">🗑️ ডিলিট</button></td></tr>`).join('')}
     </table></div>`;
   } else if(adminTab==='orders'){
     body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>অর্ডার ID</th><th>কাস্টমার</th><th>মোট</th><th>স্ট্যাটাস</th><th></th></tr>
