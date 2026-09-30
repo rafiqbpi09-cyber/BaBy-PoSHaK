@@ -70,6 +70,8 @@ th{background:#ffe3ec;color:var(--pink-dark);text-transform:uppercase;font-size:
 .stat{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);text-align:center;}
 .statnum{font-size:24px;font-weight:800;color:var(--pink-dark);}
 .statlabel{font-size:12px;color:var(--muted);}
+.ordercard{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px;cursor:pointer;}
+.ordercard small{color:var(--muted);}
 .subtabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .subtabs button{background:var(--card);border:1px solid var(--border);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;}
 .subtabs button.active{background:var(--pink);color:#fff;border-color:var(--pink);}
@@ -284,9 +286,9 @@ function renderAdminBody(){
     validOrders.forEach(o=>(o.items||[]).forEach(i=>{ salesByProduct[i.name]=(salesByProduct[i.name]||0)+(Number(i.qty)||0); }));
     const top = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
     body.innerHTML = `<div class="statgrid">
-        <div class="stat"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
-        <div class="stat"><div class="statnum">${validOrders.length}</div><div class="statlabel">মোট অর্ডার (বাতিল বাদে)</div></div>
-        <div class="stat"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showSalesDetail()"><div class="statnum">৳${totalSales}</div><div class="statlabel">মোট বিক্রি</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showOrdersDetail()"><div class="statnum">${validOrders.length}</div><div class="statlabel">মোট অর্ডার (বাতিল বাদে)</div></div>
+        <div class="stat" style="cursor:pointer" onclick="showLowStockDetail()"><div class="statnum">${lowStock}</div><div class="statlabel">লো-স্টক আইটেম</div></div>
       </div>
       <h3>টপ সেলিং প্রোডাক্ট</h3>
       ${top.length? '<ol>'+top.map(([n,q])=>`<li>${esc(n)} — ${q}টি বিক্রি হয়েছে</li>`).join('')+'</ol>' : '<p>এখনো ডেটা নেই।</p>'}`;
@@ -294,6 +296,30 @@ function renderAdminBody(){
 }
 const STATUSES = ['Pending','Confirmed','Shipped','Delivered','Cancelled'];
 const STATUS_LABEL = {Pending:'অর্ডার পেয়েছি',Confirmed:'কনফার্মড',Shipped:'কুরিয়ারে পাঠানো হয়েছে',Delivered:'ডেলিভারড',Cancelled:'বাতিল'};
+function showSalesDetail(){
+  const valid = orders.filter(o=>o.status!=='Cancelled').sort((a,b)=>(b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0)-(a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0));
+  const total = valid.reduce((s,o)=>s+(Number(o.total)||0),0);
+  const rows = valid.map(o=>`<div class="cartrow"><div>${esc(o.name)}<br><small>${esc(o.id)} · ${fmtDate(o.createdAt)}</small></div><div>৳${Number(o.total)||0}</div></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>💰 মোট বিক্রি</h2>
+    <div class="total">৳${total}</div>
+    ${rows || '<p class="note">এখনো কোনো বৈধ অর্ডার নেই।</p>'}`);
+}
+function showOrdersDetail(){
+  const valid = orders.filter(o=>o.status!=='Cancelled').sort((a,b)=>(b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0)-(a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0));
+  const rows = valid.map(o=>`<div class="ordercard" onclick="closeSheet();adminTab='orders';renderAdmin();editOrder('${esc(o.id)}')">
+      <b>${esc(o.id)}</b> · ${esc(o.name)} · ৳${Number(o.total)||0}<br>
+      <small>${STATUS_LABEL[o.status]||o.status} · ${fmtDate(o.createdAt)}</small></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🧾 মোট অর্ডার (বাতিল বাদে)</h2>
+    ${rows || '<p class="note">এখনো কোনো বৈধ অর্ডার নেই।</p>'}`);
+}
+function showLowStockDetail(){
+  const low = products.filter(p=>p.stock<=5).sort((a,b)=>a.stock-b.stock);
+  const rows = low.map(p=>`<div class="cartrow" style="cursor:pointer" onclick="closeSheet();editProduct('${p.id}')">
+      <div>${p.imageUrl?`<img src="${p.imageUrl}" style="width:28px;height:28px;object-fit:cover;border-radius:5px;vertical-align:middle;margin-right:6px;">`:p.emoji} ${esc(p.name)}</div>
+      <div class="${p.stock===0?'pstock low':''}" style="font-weight:700">${p.stock===0?'স্টক শেষ':p.stock+' পিস বাকি'}</div></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>⚠️ লো-স্টক আইটেম</h2>
+    ${rows || '<p class="note">কোনো লো-স্টক আইটেম নেই।</p>'}`);
+}
 const COURIERS = ['Pathao','Steadfast','RedX','Paperfly','eCourier','Sundarban Courier','SA Paribahan','Janani Express','নিজস্ব ডেলিভারি','Other'];
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtDate(ts){
