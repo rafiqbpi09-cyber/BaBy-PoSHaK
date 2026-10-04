@@ -39,6 +39,10 @@ service cloud.firestore {
     match /memos/{doc} {
       allow read, write: if request.auth != null;
     }
+    match /offers/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }
 ```

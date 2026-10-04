@@ -100,6 +100,14 @@ th{background:var(--border);}
 .storelayout{display:flex;gap:16px;align-items:flex-start;}
 .sidebar{width:220px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;}
 .sidebar h4{margin:14px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.offercard{background:linear-gradient(135deg,var(--pink),var(--pink-dark));color:#fff;border-radius:12px;padding:14px;margin-bottom:14px;cursor:pointer;min-height:76px;opacity:1;transition:opacity .4s ease;position:relative;overflow:hidden;}
+.offercard.fade{opacity:0;}
+.offercard .oftag{display:inline-block;background:rgba(255,255,255,.25);padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;margin-bottom:4px;}
+.offercard .oftitle{font-weight:800;font-size:15px;margin-bottom:2px;}
+.offercard .ofdesc{font-size:12px;opacity:.95;}
+.offercard .ofdots{display:flex;gap:4px;margin-top:8px;}
+.offercard .ofdots span{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.4);}
+.offercard .ofdots span.on{background:#fff;}
 .sidebar h4:first-child{margin-top:0;}
 .sidebar-link{display:flex;justify-content:space-between;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;}
 .sidebar-link:hover{background:var(--border);}
@@ -205,6 +213,39 @@ db.collection('products').onSnapshot(snap=>{
   if(!document.getElementById('storeView').classList.contains('hidden')) renderStore();
 });
 
+// ---------- LIVE OFFERS ----------
+let offers = [];
+let offerIdx = 0;
+let offerTimer = null;
+db.collection('offers').onSnapshot(snap=>{
+  offers = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(o=>o.active!==false);
+  offerIdx = 0;
+  renderOfferWidget();
+  if(offerTimer) clearInterval(offerTimer);
+  if(offers.length>1){
+    offerTimer = setInterval(()=>{
+      offerIdx = (offerIdx+1) % offers.length;
+      renderOfferWidget();
+    }, 2800);
+  }
+});
+function renderOfferWidget(){
+  const box = document.getElementById('offerWidget');
+  if(!box) return;
+  if(!offers.length){ box.innerHTML=''; return; }
+  const o = offers[offerIdx];
+  box.innerHTML = `<div class="offercard" onclick="offerClick('${o.category?esc2(o.category):''}')">
+      ${o.discount?`<span class="oftag">${esc2(o.discount)}</span>`:'<span class="oftag">🎉 অফার</span>'}
+      <div class="oftitle">${esc2(o.title)}</div>
+      ${o.description?`<div class="ofdesc">${esc2(o.description)}</div>`:''}
+      ${offers.length>1?`<div class="ofdots">${offers.map((_,i)=>`<span class="${i===offerIdx?'on':''}"></span>`).join('')}</div>`:''}
+    </div>`;
+}
+function esc2(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function offerClick(category){
+  if(category) setFilterCat(category);
+}
+
 function showView(v){
   document.getElementById('cartFab').classList.remove('hidden');
   renderStore();
@@ -243,6 +284,7 @@ function renderStore(){
     <button class="mobile-filter-toggle secondary" onclick="toggleSidebar()">☰ Filter</button>
     <div class="storelayout">
       <div class="sidebar" id="sidebarPanel">
+        <div id="offerWidget"></div>
         <h4>Special Offers</h4>
         ${sidebarLink('All','সব প্রোডাক্ট')}
         ${sidebarLink('MegaDeal','🔥 Mega Deal')}
@@ -275,6 +317,7 @@ function renderStore(){
       </div>
     </div>`;
   renderProductGrid();
+  renderOfferWidget();
 }
 function renderProductGrid(){
   const grid = document.getElementById('prodGrid');

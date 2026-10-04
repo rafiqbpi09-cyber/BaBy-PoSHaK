@@ -200,6 +200,8 @@ db.collection('products').onSnapshot(snap=>{
 });
 let memos = [];
 let unsubMemos = null;
+let offers = [];
+let unsubOffers = null;
 let unsubOrders = null;
 let firstOrderLoad = true;
 function beep(){
@@ -272,6 +274,13 @@ auth.onAuthStateChanged(u=>{
     });
   }
   if(!u && unsubMemos){ unsubMemos(); unsubMemos = null; memos = []; }
+  if(u && !unsubOffers){
+    unsubOffers = db.collection('offers').orderBy('createdAt','desc').onSnapshot(snap=>{
+      offers = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      if(isAdmin && adminTab==='offers') renderAdminBody();
+    });
+  }
+  if(!u && unsubOffers){ unsubOffers(); unsubOffers = null; offers = []; }
   renderAdmin();
 });
 
@@ -305,6 +314,7 @@ function renderAdmin(){
       <button class="${adminTab==='orders'?'active':''}" onclick="setAdminTab('orders')">🧾 অর্ডার</button>
       <button class="${adminTab==='analytics'?'active':''}" onclick="setAdminTab('analytics')">📊 রিপোর্ট</button>
       <button class="${adminTab==='memo'?'active':''}" onclick="setAdminTab('memo')">🧾 Memo</button>
+      <button class="${adminTab==='offers'?'active':''}" onclick="setAdminTab('offers')">🎁 অফার</button>
     </div>
     <div id="adminBody"></div>`;
   renderAdminBody();
@@ -335,6 +345,8 @@ function renderAdminBody(){
     renderReportsTab(body);
   } else if(adminTab==='memo'){
     renderMemoTab(body);
+  } else if(adminTab==='offers'){
+    renderOffersTab(body);
   }
 }
 function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
@@ -793,6 +805,49 @@ function printMemo(id){
   </body></html>`);
   w.document.close();
 }
+// ---------- OFFERS ----------
+function renderOffersTab(body){
+  body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editOffer(null)">+ নতুন অফার</button>
+    <p class="note" style="margin-bottom:10px">কাস্টমার পেজের বাম পাশে এই অফারগুলো একে একে (২.৫ সেকেন্ড পর পর) ঘুরে ঘুরে দেখাবে। শুধু ✅ Active অফারগুলো দেখাবে।</p>
+    ${offers.length ? offers.map(o=>`<div class="ordercard" style="cursor:default">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div><b>${esc(o.title)}</b> ${o.active?'<span class="stbadge">Active</span>':'<span class="stbadge Cancelled">Inactive</span>'}<br>
+          <small>${esc(o.description||'')}</small>${o.discount?`<br><small>🏷️ ${esc(o.discount)}</small>`:''}${o.category?`<br><small>🔗 ${esc(o.category)}</small>`:''}</div>
+          <div style="flex-shrink:0"><button class="smallbtn edit" onclick="editOffer('${o.id}')">✏️ এডিট</button><button class="smallbtn del" onclick="deleteOffer('${o.id}')">🗑️ ডিলিট</button></div>
+        </div></div>`).join('') : '<p class="note">এখনো কোনো অফার যোগ করা হয়নি।</p>'}`;
+}
+function editOffer(id){
+  const o = id ? offers.find(x=>x.id===id) : {title:'',description:'',discount:'',imageUrl:'',category:'',active:true};
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'অফার এডিট':'নতুন অফার'}</h2>
+    <label>অফারের টাইটেল</label><input id="ofTitle" value="${esc(o.title)}" placeholder="যেমন: ঈদ স্পেশাল অফার">
+    <label>বিস্তারিত</label><input id="ofDesc" value="${esc(o.description||'')}" placeholder="যেমন: সব Frock এ ২০% ছাড়">
+    <label>ডিসকাউন্ট ট্যাগ (ঐচ্ছিক)</label><input id="ofDiscount" value="${esc(o.discount||'')}" placeholder="যেমন: 20% OFF">
+    <label>ছবি URL (ঐচ্ছিক)</label><input id="ofImg" value="${esc(o.imageUrl||'')}" placeholder="https://...">
+    <label>ক্লিক করলে কোন ক্যাটাগরিতে যাবে (ঐচ্ছিক)</label>
+    <select id="ofCat"><option value="">— কোনো নির্দিষ্ট ক্যাটাগরি না —</option>${CATEGORIES.map(c=>`<option ${o.category===c?'selected':''}>${c}</option>`).join('')}</select>
+    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="ofActive" style="width:auto;margin:0;" ${o.active!==false?'checked':''}> Active (কাস্টমার পেজে দেখাবে)</label>
+    <button class="primary" style="width:100%" onclick="saveOffer('${id||''}')">সেভ করুন</button>`);
+}
+async function saveOffer(id){
+  const title = document.getElementById('ofTitle').value.trim();
+  if(!title){ alert('অফারের টাইটেল দিন'); return; }
+  const data = {
+    title,
+    description: document.getElementById('ofDesc').value.trim(),
+    discount: document.getElementById('ofDiscount').value.trim(),
+    imageUrl: document.getElementById('ofImg').value.trim(),
+    category: document.getElementById('ofCat').value,
+    active: document.getElementById('ofActive').checked
+  };
+  if(id){ await db.collection('offers').doc(id).update(data); }
+  else{ data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection('offers').add(data); }
+  closeSheet();
+}
+async function deleteOffer(id){
+  if(!confirm('এই অফারটি ডিলিট করবেন?')) return;
+  await db.collection('offers').doc(id).delete();
+}
+
 function editProduct(id){
   const p = id ? products.find(x=>x.id===id) : {name:'',emoji:'👶',price:0,purchasePrice:0,originalPrice:0,stock:0,category:'',subcategory:'',ageGroup:'',imageUrl:'',extraImages:'',features:''};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'প্রোডাক্ট এডিট':'নতুন প্রোডাক্ট'}</h2>
