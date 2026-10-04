@@ -21,6 +21,10 @@ header h1{margin:0;font-size:20px;cursor:pointer;}
 .navicon{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px;color:#fff;position:relative;}
 .navicon span.ic{font-size:18px;}
 .navbadge{position:absolute;top:-6px;right:-10px;background:#fff;color:var(--pink-dark);border-radius:10px;font-size:10px;font-weight:800;padding:1px 5px;}
+.navbadge.urgent{background:#ff3b30;color:#fff;animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.25);}}
+.newordermodal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;}
+.newordercard{background:var(--card);border-radius:16px;padding:22px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.3);}
 .navwrap{position:sticky;top:62px;z-index:9;background:var(--card);border-bottom:1px solid var(--border);}
 .categorynav{display:flex;overflow-x:auto;padding:0 8px;}
 .navitem{flex-shrink:0;padding:12px 14px;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;}
@@ -131,6 +135,7 @@ th{background:#ffe3ec;color:var(--pink-dark);text-transform:uppercase;font-size:
 <header>
   <h1>🛠 Baby Poshak Admin</h1>
   <div class="navicons">
+    <div class="navicon hidden" id="notifBell" onclick="showPendingOrdersSheet()"><span class="ic">🔔</span><small>Orders</small><span class="navbadge hidden" id="notifBadge">0</span></div>
     <a href="index.html" class="navicon" style="text-decoration:none"><span class="ic">🛍</span><small>দোকান দেখুন</small></a>
     <div class="navicon hidden" id="logoutBtn" onclick="auth.signOut()"><span class="ic">🚪</span><small>লগআউট</small></div>
   </div>
@@ -204,6 +209,35 @@ function beep(){
     o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 300);
   }catch(e){}
 }
+function updateNotifBadge(){
+  const bell = document.getElementById('notifBell'); if(!bell) return;
+  const count = orders.filter(o=>o.status==='Pending').length;
+  bell.classList.toggle('hidden', !isAdmin);
+  const badge = document.getElementById('notifBadge');
+  badge.textContent = count;
+  badge.classList.toggle('hidden', count===0);
+  badge.classList.toggle('urgent', count>0);
+}
+function showPendingOrdersSheet(){
+  const pending = orders.filter(o=>o.status==='Pending').sort((a,b)=>orderMs(b)-orderMs(a));
+  const rows = pending.map(o=>`<div class="ordercard" onclick="closeSheet();adminTab='orders';renderAdmin();editOrder('${esc(o.id)}')">
+      <b>${esc(o.name)}</b> · ${esc(o.phone)}<br>
+      <small>${esc(o.id)} · ৳${Number(o.total)||0} · ${fmtDate(o.createdAt)}</small></div>`).join('');
+  showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🔔 নতুন অর্ডার (${pending.length})</h2>
+    ${rows || '<p class="note">এখন কোনো নতুন/পেন্ডিং অর্ডার নেই।</p>'}`);
+}
+function showNewOrderPopup(o){
+  const m = document.createElement('div');
+  m.className = 'newordermodal';
+  m.innerHTML = `<div class="newordercard">
+      <div style="font-size:40px">🛒</div>
+      <h2 style="margin:6px 0">নতুন অর্ডার এসেছে!</h2>
+      <p style="font-size:15px"><b>${esc(o.name)}</b><br>${esc(o.phone)}<br>৳${Number(o.total)||0} · ${(o.items||[]).length}টি আইটেম</p>
+      <button class="primary" style="width:100%;margin-bottom:8px" onclick="this.closest('.newordermodal').remove();adminTab='orders';renderAdmin();editOrder('${esc(o.id)}')">বিস্তারিত দেখুন</button>
+      <button class="secondary" style="width:100%" onclick="this.closest('.newordermodal').remove()">বন্ধ করুন</button>
+    </div>`;
+  document.body.appendChild(m);
+}
 function notifyNewOrder(o){
   beep();
   if('Notification' in window && Notification.permission==='granted'){
@@ -211,6 +245,7 @@ function notifyNewOrder(o){
   }
   const banner = document.getElementById('newOrderBanner');
   if(banner){ banner.classList.remove('hidden'); banner.querySelector('span').textContent = `🛒 নতুন অর্ডার: ${o.name} — ৳${o.total}`; }
+  showNewOrderPopup(o);
 }
 auth.onAuthStateChanged(u=>{
   isAdmin = !!u;
@@ -223,10 +258,11 @@ auth.onAuthStateChanged(u=>{
       }
       firstOrderLoad = false;
       orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      updateNotifBadge();
       if(isAdmin && (adminTab==='orders'||adminTab==='analytics')) renderAdminBody();
     });
   }
-  if(!u && unsubOrders){ unsubOrders(); unsubOrders = null; orders = []; }
+  if(!u && unsubOrders){ unsubOrders(); unsubOrders = null; orders = []; updateNotifBadge(); }
   if(u && !unsubMemos){
     unsubMemos = db.collection('memos').orderBy('createdAt','desc').onSnapshot(snap=>{
       memos = snap.docs.map(d=>({id:d.id, ...d.data()}));
