@@ -138,18 +138,14 @@ th{background:var(--border);}
 .qp-pink{background:#ffe8ef;color:#e11d6f;}
 .qp-green{background:#e6f9f0;color:#0e9f6e;}
 .qp-purple{background:#f1e8ff;color:#7c3aed;}
-.mobile-filter-toggle{display:none;width:auto;margin-bottom:10px;}
+.mobile-filter-toggle{display:none;}
 @media (max-width:700px){
-  .storelayout{flex-direction:column;}
-  .mobile-filter-toggle{display:inline-block;}
-  .sidebar{position:fixed;top:0;bottom:0;left:0;width:82%;max-width:320px;z-index:70;border-radius:0;transform:translateX(-105%);transition:transform .25s ease;overflow-y:auto;display:block;padding-top:54px;}
-  .sidebar.open{transform:translateX(0);}
-  .sidebarbackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65;}
-  .sidebarbackdrop.open{display:block;}
+  .sidebar{width:132px;padding:10px;font-size:12px;}
+  .sidebar h4{font-size:10px;margin:10px 0 5px;}
+  .sidebar-link,.sidebar-sub{font-size:11px;padding:5px 4px;}
+  .storelayout{gap:8px;}
+  .main-inner{padding-left:2px;}
 }
-.sidebarhead{display:none;position:fixed;top:0;left:0;width:82%;max-width:320px;z-index:71;background:var(--card);align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);font-weight:800;}
-.sidebarhead.open{display:flex;}
-.sidebarhead button{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);}
 .whatsfab{position:fixed;bottom:20px;left:20px;background:#25D366;color:#fff;border:none;border-radius:50%;width:52px;height:52px;box-shadow:var(--shadow);z-index:20;font-size:24px;display:flex;align-items:center;justify-content:center;text-decoration:none;}
 </style>
 </head>
@@ -168,8 +164,6 @@ th{background:var(--border);}
 </main>
 <button class="cartfab hidden" id="cartFab" onclick="openCart()">🛒 <span id="cartCount">0</span></button>
 <a class="whatsfab hidden" id="waFab" target="_blank" href="#">💬</a>
-<div class="sidebarbackdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
-<div class="sidebarhead" id="sidebarHead"><span>MENU</span><button onclick="toggleSidebar()">✕</button></div>
 
 <!-- Firebase (compat SDK, works with plain script tags) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -303,7 +297,6 @@ function renderStore(){
     </div>`;
   el.innerHTML = `
     <div id="offerWidget"></div>
-    <button class="mobile-filter-toggle secondary" onclick="toggleSidebar()">☰ Filter</button>
     <div class="storelayout">
       <div class="sidebar" id="sidebarPanel">
         <h4>Special Offers</h4>
@@ -373,11 +366,7 @@ function renderProductGrid(){
   });
   updateCartCount();
 }
-function toggleSidebar(){
-  document.getElementById('sidebarPanel').classList.toggle('open');
-  document.getElementById('sidebarBackdrop').classList.toggle('open');
-  document.getElementById('sidebarHead').classList.toggle('open');
-}
+
 function setSub(i,j){
   const c = CATEGORIES[i];
   filterCat = c; filterSubcat = SUBCATS[c][j]; searchQuery = '';
