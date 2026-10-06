@@ -377,7 +377,21 @@ function setFilterCat(c){ filterCat=c; filterSubcat='All'; renderStore(); }
 function setFilterAge(a){ filterAge=a; renderStore(); }
 function setFilterSize(s){ filterSize=s; renderStore(); }
 function clearSubcat(){ filterSubcat='All'; renderStore(); }
-function addToCart(id, qty){ qty = qty||1; cart[id]=(cart[id]||0)+qty; updateCartCount(); }
+function addToCart(id, qty){
+  qty = qty||1;
+  const p = products.find(x=>x.id===id);
+  const stock = p ? (Number(p.stock)||0) : 0;
+  const current = cart[id]||0;
+  const allowed = Math.max(0, stock - current);
+  if(allowed <= 0){ alert(`দুঃখিত, এই প্রোডাক্টের স্টকে মাত্র ${stock} পিস আছে, আর যোগ করা যাবে না।`); return; }
+  if(qty > allowed){
+    cart[id] = current + allowed;
+    alert(`স্টকে মাত্র ${stock} পিস আছে, তাই ${allowed} পিস কার্টে যোগ করা হলো।`);
+  } else {
+    cart[id] = current + qty;
+  }
+  updateCartCount();
+}
 function updateCartCount(){
   const c = Object.values(cart).reduce((a,b)=>a+b,0);
   document.getElementById('cartCount').textContent = c;
@@ -409,6 +423,7 @@ function showProductDetail(id){
   const out = p.stock<=0;
   const allImages = [p.imageUrl, ...((p.extraImages||'').split(',').map(s=>s.trim()).filter(Boolean))].filter(Boolean);
   detailQty = 1;
+  detailProductId = p.id;
   const gallery = allImages.length ? `<div class="detail-gallery">
       ${allImages.length>1?`<div class="thumbs">${allImages.map(u=>`<img src="${u}" onclick="document.getElementById('mainDetailImg').src='${u}'">`).join('')}</div>`:''}
       <img id="mainDetailImg" class="mainimg" src="${allImages[0]}" onclick="openImageZoom(this.src)">
@@ -440,8 +455,13 @@ function showProductDetail(id){
     ${featuresHtml}`);
 }
 let detailQty = 1;
+let detailProductId = null;
 function changeDetailQty(d){
-  detailQty = Math.max(1, detailQty+d);
+  const p = products.find(x=>x.id===detailProductId);
+  const stock = p ? (Number(p.stock)||0) : 99999;
+  const next = detailQty + d;
+  if(next > stock){ alert(`স্টকে মাত্র ${stock} পিস আছে।`); return; }
+  detailQty = Math.max(1, next);
   const el = document.getElementById('detailQtyVal'); if(el) el.textContent = detailQty;
 }
 function shareGeneric(name){
@@ -469,7 +489,15 @@ function openCart(){
     <div class="total">মোট: ৳${total}</div>
     ${items.length? `<button class="primary" style="width:100%" onclick="openCheckout()">চেকআউট করুন</button>` : ''}`);
 }
-function changeQty(id,d){ cart[id]=Math.max(0,(cart[id]||0)+d); if(cart[id]===0) delete cart[id]; updateCartCount(); openCart(); }
+function changeQty(id,d){
+  const p = products.find(x=>x.id===id);
+  const stock = p ? (Number(p.stock)||0) : 99999;
+  const next = (cart[id]||0) + d;
+  if(d>0 && next > stock){ alert(`স্টকে মাত্র ${stock} পিস আছে, আর বাড়ানো যাবে না।`); return; }
+  cart[id]=Math.max(0, next);
+  if(cart[id]===0) delete cart[id];
+  updateCartCount(); openCart();
+}
 function openCheckout(){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>অর্ডার তথ্য দিন</h2>
     <label>আপনার নাম</label><input id="cName">
@@ -486,6 +514,23 @@ async function placeOrder(){
   if(!name||!phone){ alert('নাম ও মোবাইল নম্বর দিন'); return; }
   const items = Object.entries(cart).filter(([id,q])=>q>0).map(([id,q])=>{ const p=products.find(x=>x.id===id); return {id,name:p.name,price:p.price,qty:q}; });
   if(!items.length){ alert('কার্ট খালি'); return; }
+  let stockChanged = false;
+  for(const it of items){
+    const p = products.find(x=>x.id===it.id);
+    const stock = p ? (Number(p.stock)||0) : 0;
+    if(it.qty > stock){
+      cart[it.id] = stock>0 ? stock : 0;
+      if(stock<=0) delete cart[it.id];
+      it.qty = stock;
+      stockChanged = true;
+    }
+  }
+  if(stockChanged){
+    updateCartCount();
+    alert('দুঃখিত, কার্টের কিছু প্রোডাক্টের স্টক কমে গেছে, কার্ট আপডেট করা হলো — আবার চেক করে অর্ডার কনফার্ম করুন।');
+    closeSheet(); openCart();
+    return;
+  }
   const total = items.reduce((s,i)=>s+i.price*i.qty,0);
   const orderId = genOrderId();
   try{
