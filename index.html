@@ -34,6 +34,12 @@ main{max-width:900px;margin:0 auto;padding:16px;padding-bottom:90px;}
 .pprice{color:var(--pink-dark);font-weight:700;}
 .pstock{font-size:12px;color:var(--muted);}
 .pstock.low{color:#d9534f;font-weight:600;}
+.cardbadge{position:absolute;left:0;top:0;z-index:1;padding:3px 9px;border-radius:0 0 8px 0;font-size:11px;font-weight:800;color:#fff;}
+.badge-off{background:var(--pink-dark);}
+.badge-new{background:#17a2b8;}
+.sizepills{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;}
+.sizepills span{border:1px solid var(--border);border-radius:10px;padding:1px 8px;font-size:10px;color:var(--muted);}
+.quickshop{background:#20504a;letter-spacing:.5px;font-size:12px;text-transform:uppercase;}
 button.buy{width:100%;margin-top:8px;background:var(--pink);color:#fff;border:none;padding:9px;border-radius:10px;font-weight:600;cursor:pointer;}
 button.buy:disabled{background:#ccc;cursor:not-allowed;}
 .cartfab{position:fixed;bottom:20px;right:20px;background:var(--pink-dark);color:#fff;border:none;border-radius:50px;padding:14px 20px;font-weight:700;box-shadow:var(--shadow);cursor:pointer;z-index:20;}
@@ -135,10 +141,16 @@ th{background:var(--border);}
 .mobile-filter-toggle{display:none;width:auto;margin-bottom:10px;}
 @media (max-width:700px){
   .storelayout{flex-direction:column;}
-  .sidebar{width:100%;display:none;}
-  .sidebar.open{display:block;}
   .mobile-filter-toggle{display:inline-block;}
+  .sidebar{position:fixed;top:0;bottom:0;left:0;width:82%;max-width:320px;z-index:70;border-radius:0;transform:translateX(-105%);transition:transform .25s ease;overflow-y:auto;display:block;padding-top:54px;}
+  .sidebar.open{transform:translateX(0);}
+  .sidebarbackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65;}
+  .sidebarbackdrop.open{display:block;}
 }
+.sidebarhead{display:none;position:fixed;top:0;left:0;width:82%;max-width:320px;z-index:71;background:var(--card);align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);font-weight:800;}
+.sidebarhead.open{display:flex;}
+.sidebarhead button{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);}
+.whatsfab{position:fixed;bottom:20px;left:20px;background:#25D366;color:#fff;border:none;border-radius:50%;width:52px;height:52px;box-shadow:var(--shadow);z-index:20;font-size:24px;display:flex;align-items:center;justify-content:center;text-decoration:none;}
 </style>
 </head>
 <body>
@@ -155,6 +167,9 @@ th{background:var(--border);}
   <div id="storeView"></div>
 </main>
 <button class="cartfab hidden" id="cartFab" onclick="openCart()">🛒 <span id="cartCount">0</span></button>
+<a class="whatsfab hidden" id="waFab" target="_blank" href="#">💬</a>
+<div class="sidebarbackdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+<div class="sidebarhead" id="sidebarHead"><span>MENU</span><button onclick="toggleSidebar()">✕</button></div>
 
 <!-- Firebase (compat SDK, works with plain script tags) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -253,6 +268,7 @@ function offerClick(category){
 
 function showView(v){
   document.getElementById('cartFab').classList.remove('hidden');
+  document.getElementById('waFab').classList.remove('hidden');
   renderStore();
 }
 
@@ -336,19 +352,32 @@ function renderProductGrid(){
   filtered.forEach(p=>{
     const low = p.stock<=5, out = p.stock<=0;
     const media = p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.name}" style="width:100%;height:110px;object-fit:cover;border-radius:10px;margin-bottom:6px;">` : `<div class="emoji">${p.emoji||'👶'}</div>`;
+    const hasDiscount = p.originalPrice && p.originalPrice > p.price;
+    const discountPct = hasDiscount ? Math.round((1 - p.price/p.originalPrice)*100) : 0;
+    const isNew = p.createdAtMs && (Date.now() - p.createdAtMs) < 14*24*60*60*1000;
+    const pills = [p.ageGroup, p.size?('Size '+p.size):''].filter(Boolean);
     grid.innerHTML += `<div class="card" onclick="showProductDetail('${p.id}')" style="cursor:pointer;position:relative;">
-      <button onclick="event.stopPropagation();toggleWishlist('${p.id}')" style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.85);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;">${wishlist.includes(p.id)?'❤️':'🤍'}</button>
-      ${media}
+      <button onclick="event.stopPropagation();toggleWishlist('${p.id}')" style="position:absolute;top:8px;right:8px;z-index:2;background:rgba(255,255,255,.85);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;">${wishlist.includes(p.id)?'❤️':'🤍'}</button>
+      <div style="position:relative;">
+        ${hasDiscount?`<span class="cardbadge badge-off">-${discountPct}%</span>`:''}
+        ${isNew?`<span class="cardbadge badge-new" style="${hasDiscount?'top:30px;':''}">New</span>`:''}
+        ${media}
+      </div>
       <div class="pname">${p.name}</div>
-      <div class="pstock">${p.category||''}${p.ageGroup?' · '+p.ageGroup:''}${p.size?' · Size '+p.size:''}</div>
-      <div class="pprice">৳${p.price}</div>
+      <div class="pstock">${p.category||''}</div>
+      ${pills.length?`<div class="sizepills">${pills.map(s=>`<span>${s}</span>`).join('')}</div>`:''}
+      <div class="pprice">৳${p.price}${hasDiscount?`<span class="oldprice" style="font-size:12px">৳${p.originalPrice}</span>`:''}</div>
       <div class="pstock ${low?'low':''}">${out?'স্টকে নেই':'স্টক: '+p.stock}</div>
-      <button class="buy" ${out?'disabled':''} onclick="event.stopPropagation();addToCart('${p.id}')">${out?'Out of stock':'কার্টে যোগ করুন'}</button>
+      <button class="buy quickshop" ${out?'disabled':''} onclick="event.stopPropagation();addToCart('${p.id}')">${out?'OUT OF STOCK':'QUICK SHOP'}</button>
     </div>`;
   });
   updateCartCount();
 }
-function toggleSidebar(){ document.getElementById('sidebarPanel').classList.toggle('open'); }
+function toggleSidebar(){
+  document.getElementById('sidebarPanel').classList.toggle('open');
+  document.getElementById('sidebarBackdrop').classList.toggle('open');
+  document.getElementById('sidebarHead').classList.toggle('open');
+}
 function setSub(i,j){
   const c = CATEGORIES[i];
   filterCat = c; filterSubcat = SUBCATS[c][j]; searchQuery = '';
@@ -579,6 +608,7 @@ function showSheet(html){
 }
 function closeSheet(){ const ov=document.getElementById('sheetOverlay'); if(ov) ov.remove(); }
 
+document.getElementById('waFab').href = 'https://wa.me/'+BUSINESS_PHONE;
 showView('store');
 </script>
 </body>
