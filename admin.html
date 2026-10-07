@@ -821,7 +821,9 @@ function editOffer(id){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'অফার এডিট':'নতুন অফার'}</h2>
     <label>অফারের টাইটেল</label><input id="ofTitle" value="${esc(o.title)}" placeholder="যেমন: ঈদ স্পেশাল অফার">
     <label>বিস্তারিত</label><input id="ofDesc" value="${esc(o.description||'')}" placeholder="যেমন: সব Frock এ ২০% ছাড়">
-    <label>ডিসকাউন্ট ট্যাগ (ঐচ্ছিক)</label><input id="ofDiscount" value="${esc(o.discount||'')}" placeholder="যেমন: 20% OFF">
+    <label>ডিসকাউন্ট ট্যাগ (ঐচ্ছিক, শুধু দেখানোর জন্য)</label><input id="ofDiscount" value="${esc(o.discount||'')}" placeholder="যেমন: 20% OFF">
+    <label>আসল ছাড়ের হার (%) — এটা দিলে প্রোডাক্টের দাম থেকে সত্যিই এই % কমে কাস্টমার অর্ডার করতে পারবে (নিচে "নির্দিষ্ট প্রোডাক্ট" বেছে নিলে কাজ করবে)</label>
+    <input id="ofDiscountPct" type="number" min="0" max="90" value="${o.discountPercent||''}" placeholder="যেমন: 20">
     <label>ছবি URL (ঐচ্ছিক, না দিলে প্রোডাক্টের ছবি ব্যবহার হবে)</label><input id="ofImg" value="${esc(o.imageUrl||'')}" placeholder="https://...">
     <label>নির্দিষ্ট প্রোডাক্ট (ঐচ্ছিক) — দিলে ক্লিক করে সরাসরি অর্ডার করা যাবে</label>
     <select id="ofProduct"><option value="">— কোনো নির্দিষ্ট প্রোডাক্ট না —</option>${products.map(p=>`<option value="${p.id}" ${o.productId===p.id?'selected':''}>${esc(p.name)} (স্টক: ${p.stock}, ৳${p.price})</option>`).join('')}</select>
@@ -837,6 +839,7 @@ async function saveOffer(id){
     title,
     description: document.getElementById('ofDesc').value.trim(),
     discount: document.getElementById('ofDiscount').value.trim(),
+    discountPercent: parseFloat(document.getElementById('ofDiscountPct').value)||0,
     imageUrl: document.getElementById('ofImg').value.trim(),
     productId: document.getElementById('ofProduct').value,
     category: document.getElementById('ofCat').value,

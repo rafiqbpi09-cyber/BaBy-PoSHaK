@@ -27,7 +27,7 @@ service cloud.firestore {
       allow get: if true;
       allow list, update, delete: if request.auth != null;
       allow create: if doc.matches('BP-[A-Z0-9]{8}')
-        && request.resource.data.keys().hasOnly(['name','phone','addr','pay','items','total','status','history','createdAt'])
+        && request.resource.data.keys().hasOnly(['name','phone','addr','pay','items','deliveryArea','deliveryCharge','total','status','history','createdAt'])
         && request.resource.data.status == 'Pending'
         && request.resource.data.createdAt == request.time
         && request.resource.data.name is string && request.resource.data.name.size() < 100
