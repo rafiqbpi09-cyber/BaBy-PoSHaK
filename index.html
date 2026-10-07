@@ -176,7 +176,7 @@ const db = firebase.firestore();
 // ⚠️ এখানে আপনার বিজনেসের আসল ফোন/হোয়াটসঅ্যাপ নম্বর বসান (দেশের কোড সহ, + ছাড়া)
 const BUSINESS_PHONE = "8801712863183";
 // ⚠️ ডেলিভারি চার্জ — প্রয়োজনমতো বদলে নিন
-const DELIVERY_CHARGES = { 'ঢাকার ভিতরে': 70, 'ঢাকার বাইরে': 130 };
+const DELIVERY_CHARGES = { 'ঢাকার ভিতরে': 90, 'ঢাকার বাইরে': 140 };
 let offerPriceOverride = {};
 function priceFor(id){
   const p = products.find(x=>x.id===id);
