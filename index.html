@@ -245,18 +245,26 @@ function renderOfferWidget(){
   if(!box) return;
   if(!offers.length){ box.innerHTML=''; return; }
   const o = offers[offerIdx];
-  box.innerHTML = `<div class="offercard ${o.imageUrl?'has-img':''}" onclick="offerClick('${o.category?esc2(o.category):''}')">
-      ${o.imageUrl?`<img src="${esc2(o.imageUrl)}" alt="${esc2(o.title)}">`:''}
+  const imgUrl = o.imageUrl || (o.productId && (products.find(p=>p.id===o.productId)||{}).imageUrl) || '';
+  box.innerHTML = `<div class="offercard ${imgUrl?'has-img':''}" onclick="offerClick('${o.productId?esc2(o.productId):''}','${o.category?esc2(o.category):''}')">
+      ${imgUrl?`<img src="${esc2(imgUrl)}" alt="${esc2(o.title)}">`:''}
       <div class="ofcontent">
         ${o.discount?`<span class="oftag">${esc2(o.discount)}</span>`:'<span class="oftag">🎉 অফার</span>'}
         <div class="oftitle">${esc2(o.title)}</div>
         ${o.description?`<div class="ofdesc">${esc2(o.description)}</div>`:''}
+        ${o.productId?`<div class="ofdesc" style="margin-top:4px;font-weight:700">🛍️ অর্ডার করতে ট্যাপ করুন</div>`:''}
         ${offers.length>1?`<div class="ofdots">${offers.map((_,i)=>`<span class="${i===offerIdx?'on':''}"></span>`).join('')}</div>`:''}
       </div>
     </div>`;
 }
 function esc2(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function offerClick(category){
+function offerClick(productId, category){
+  if(productId){
+    const p = products.find(x=>x.id===productId);
+    if(p){ showProductDetail(productId); return; }
+    alert('দুঃখিত, এই অফারের প্রোডাক্টটি এখন পাওয়া যাচ্ছে না।');
+    return;
+  }
   if(category) setFilterCat(category);
 }
 

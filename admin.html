@@ -812,18 +812,20 @@ function renderOffersTab(body){
     ${offers.length ? offers.map(o=>`<div class="ordercard" style="cursor:default">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div><b>${esc(o.title)}</b> ${o.active?'<span class="stbadge">Active</span>':'<span class="stbadge Cancelled">Inactive</span>'}<br>
-          <small>${esc(o.description||'')}</small>${o.discount?`<br><small>🏷️ ${esc(o.discount)}</small>`:''}${o.category?`<br><small>🔗 ${esc(o.category)}</small>`:''}</div>
+          <small>${esc(o.description||'')}</small>${o.discount?`<br><small>🏷️ ${esc(o.discount)}</small>`:''}${o.productId?`<br><small>🛍️ ${esc((products.find(p=>p.id===o.productId)||{}).name||'(প্রোডাক্ট পাওয়া যায়নি)')}</small>`:o.category?`<br><small>🔗 ${esc(o.category)}</small>`:''}</div>
           <div style="flex-shrink:0"><button class="smallbtn edit" onclick="editOffer('${o.id}')">✏️ এডিট</button><button class="smallbtn del" onclick="deleteOffer('${o.id}')">🗑️ ডিলিট</button></div>
         </div></div>`).join('') : '<p class="note">এখনো কোনো অফার যোগ করা হয়নি।</p>'}`;
 }
 function editOffer(id){
-  const o = id ? offers.find(x=>x.id===id) : {title:'',description:'',discount:'',imageUrl:'',category:'',active:true};
+  const o = id ? offers.find(x=>x.id===id) : {title:'',description:'',discount:'',imageUrl:'',category:'',productId:'',active:true};
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>${id?'অফার এডিট':'নতুন অফার'}</h2>
     <label>অফারের টাইটেল</label><input id="ofTitle" value="${esc(o.title)}" placeholder="যেমন: ঈদ স্পেশাল অফার">
     <label>বিস্তারিত</label><input id="ofDesc" value="${esc(o.description||'')}" placeholder="যেমন: সব Frock এ ২০% ছাড়">
     <label>ডিসকাউন্ট ট্যাগ (ঐচ্ছিক)</label><input id="ofDiscount" value="${esc(o.discount||'')}" placeholder="যেমন: 20% OFF">
-    <label>ছবি URL (ঐচ্ছিক)</label><input id="ofImg" value="${esc(o.imageUrl||'')}" placeholder="https://...">
-    <label>ক্লিক করলে কোন ক্যাটাগরিতে যাবে (ঐচ্ছিক)</label>
+    <label>ছবি URL (ঐচ্ছিক, না দিলে প্রোডাক্টের ছবি ব্যবহার হবে)</label><input id="ofImg" value="${esc(o.imageUrl||'')}" placeholder="https://...">
+    <label>নির্দিষ্ট প্রোডাক্ট (ঐচ্ছিক) — দিলে ক্লিক করে সরাসরি অর্ডার করা যাবে</label>
+    <select id="ofProduct"><option value="">— কোনো নির্দিষ্ট প্রোডাক্ট না —</option>${products.map(p=>`<option value="${p.id}" ${o.productId===p.id?'selected':''}>${esc(p.name)} (স্টক: ${p.stock}, ৳${p.price})</option>`).join('')}</select>
+    <label>অথবা — ক্লিক করলে কোন ক্যাটাগরিতে যাবে (ঐচ্ছিক, প্রোডাক্ট বেছে নিলে এটা লাগবে না)</label>
     <select id="ofCat"><option value="">— কোনো নির্দিষ্ট ক্যাটাগরি না —</option>${CATEGORIES.map(c=>`<option ${o.category===c?'selected':''}>${c}</option>`).join('')}</select>
     <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="ofActive" style="width:auto;margin:0;" ${o.active!==false?'checked':''}> Active (কাস্টমার পেজে দেখাবে)</label>
     <button class="primary" style="width:100%" onclick="saveOffer('${id||''}')">সেভ করুন</button>`);
@@ -836,6 +838,7 @@ async function saveOffer(id){
     description: document.getElementById('ofDesc').value.trim(),
     discount: document.getElementById('ofDiscount').value.trim(),
     imageUrl: document.getElementById('ofImg').value.trim(),
+    productId: document.getElementById('ofProduct').value,
     category: document.getElementById('ofCat').value,
     active: document.getElementById('ofActive').checked
   };
