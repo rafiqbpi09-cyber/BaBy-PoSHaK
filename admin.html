@@ -623,7 +623,7 @@ function renderMemoCreate(el){
     <label>মোবাইল নম্বর (ঐচ্ছিক)</label><input id="memoCustPhone" placeholder="01XXXXXXXXX">
     <label>ঠিকানা (ঐচ্ছিক)</label><input id="memoCustAddr" placeholder="যেমন: রুপাতলী, বরিশাল">
     <label>Payment Method</label>
-    <select id="memoPay"><option>Cash on Delivery</option><option>Cash</option><option>bKash</option><option>Nagad</option></select>
+    <select id="memoPay"><option>Cash on Delivery</option><option>Cash</option><option>bKash</option><option>Nagad</option><option>Pubali Bank PLC</option><option>Islami Bank PLC</option></select>
     <label>কুরিয়ার (ঐচ্ছিক, হোম ডেলিভারি হলে)</label>
     <select id="memoCourier"><option value="">— প্রযোজ্য নয় —</option>${COURIERS.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
     <label>ট্র্যাকিং ID (ঐচ্ছিক)</label><input id="memoTrackId" placeholder="TRK-XXXXXXXX">

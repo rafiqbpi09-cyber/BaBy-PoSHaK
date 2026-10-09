@@ -100,6 +100,11 @@ th{background:var(--border);}
 .ordercard small{color:var(--muted);}
 .stbadge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#e6f9f0;color:#0e9f6e;}
 .stbadge.Cancelled{background:#ffe3e3;color:#c92a2a;}
+.bankcard{background:#eef4ff;border:1px solid #cfdcf7;border-radius:12px;padding:12px 14px;margin:6px 0 14px;font-size:13px;color:#1f2937;}
+.bankcard .bankhead{font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:14px;}
+.bankcard .bankrow{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #cfdcf7;}
+.bankcard .bankrow span{color:#6b7280;}
+.bankcard .bankrow b{text-align:right;word-break:break-all;}
 .courierbox{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:13px;line-height:1.7;}
 .features-list{margin:8px 0;padding-left:18px;font-size:13px;}
 .features-list li{margin-bottom:3px;}
@@ -177,6 +182,31 @@ const db = firebase.firestore();
 const BUSINESS_PHONE = "8801712863183";
 // ⚠️ ডেলিভারি চার্জ — প্রয়োজনমতো বদলে নিন
 const DELIVERY_CHARGES = { 'ঢাকার ভিতরে': 70, 'ঢাকার বাইরে': 130 };
+// ব্যাংক ট্রান্সফারের অ্যাকাউন্ট তথ্য
+const BANK_ACCOUNTS = {
+  'Pubali Bank PLC': { accountName:'Md Rafiqul Islam', branch:'Faridpur Branch', accountNumber:'0427101108526' },
+  'Islami Bank PLC': { accountName:'Md Rafiqul Islam', branch:'Barguna Branch', accountNumber:'20502340202266600' }
+};
+function bankCardHtml(pay){
+  const b = BANK_ACCOUNTS[pay]; if(!b) return '';
+  return `<div class="bankcard">
+    <div class="bankhead">🏦 ${esc(pay)}</div>
+    <div class="bankrow"><span>Account Name</span><b>${esc(b.accountName)}</b></div>
+    <div class="bankrow"><span>Branch</span><b>${esc(b.branch)}</b></div>
+    <div class="bankrow"><span>Account Number</span><b>${esc(b.accountNumber)}</b></div>
+    <button type="button" class="secondary" style="width:100%;margin-top:8px;padding:9px" onclick="copyAccountNo('${esc(b.accountNumber)}')">📋 অ্যাকাউন্ট নম্বর কপি করুন</button>
+    <p class="note" style="margin:8px 0 0">এই অ্যাকাউন্টে মোট টাকা পাঠিয়ে ট্রান্সফারের স্ক্রিনশট/রেফারেন্স নম্বর আমাদের WhatsApp-এ পাঠান। পেমেন্ট যাচাই হলে অর্ডার কনফার্ম করা হবে।</p>
+  </div>`;
+}
+function copyAccountNo(n){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(n).then(()=>alert('অ্যাকাউন্ট নম্বর কপি হয়েছে'), ()=>alert('কপি করা যায়নি, নম্বরটি নিজে কপি করুন: '+n));
+  } else { alert('অ্যাকাউন্ট নম্বর: '+n); }
+}
+function updatePayInfo(){
+  const box = document.getElementById('payInfoBox'); if(!box) return;
+  box.innerHTML = bankCardHtml(document.getElementById('cPay').value);
+}
 let offerPriceOverride = {};
 function priceFor(id){
   const p = products.find(x=>x.id===id);
@@ -527,7 +557,12 @@ function openCheckout(){
     <label>আপনার নাম</label><input id="cName">
     <label>মোবাইল নম্বর</label><input id="cPhone" placeholder="01XXXXXXXXX">
     <label>ঠিকানা</label><textarea id="cAddr" rows="2"></textarea>
-    <label>পেমেন্ট মেথড</label><select id="cPay"><option>bKash</option><option>Nagad</option><option>Cash on Delivery</option></select>
+    <label>পেমেন্ট মেথড</label>
+    <select id="cPay" onchange="updatePayInfo()">
+      <option>bKash</option><option>Nagad</option><option>Cash on Delivery</option>
+      <optgroup label="ব্যাংক ট্রান্সফার">${Object.keys(BANK_ACCOUNTS).map(b=>`<option>${esc(b)}</option>`).join('')}</optgroup>
+    </select>
+    <div id="payInfoBox"></div>
     <label>ডেলিভারি এলাকা</label>
     <select id="cArea" onchange="updateCheckoutTotal()">${areas.map(a=>`<option value="${a}">${a} (ডেলিভারি চার্জ ৳${DELIVERY_CHARGES[a]})</option>`).join('')}</select>
     <div id="checkoutTotalBox" style="font-size:13px;line-height:1.9;margin:6px 0 14px;"></div>
@@ -586,6 +621,7 @@ async function placeOrder(){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🎉 অর্ডার সফল হয়েছে!</h2>
     <p>আপনার অর্ডার ID: <b style="font-size:18px">${orderId}</b><br><small>এটা সংরক্ষণ করুন — এই ID দিয়ে যেকোনো সময় অর্ডার ট্র্যাক করতে পারবেন।</small></p>
     <p>সাবটোটাল: ৳${subtotal}<br>ডেলিভারি চার্জ (${deliveryArea}): ৳${deliveryCharge}<br>মোট: <b>৳${total}</b></p>
+    ${bankCardHtml(pay)}
     <button class="primary" style="width:100%;margin-bottom:8px" onclick="openOrder('${orderId}')">📦 অর্ডার ট্র্যাক করুন</button>
     <a class="secondary" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="https://wa.me/${BUSINESS_PHONE}?text=${msg}" target="_blank">📲 WhatsApp না খুললে এখানে চাপুন</a>
     <button class="secondary" style="width:100%" onclick="closeSheet();">ঠিক আছে</button>`);
@@ -663,7 +699,7 @@ async function openOrder(id){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button>
     <h2 style="margin-bottom:2px">${esc(id)}</h2>
     <small style="color:var(--muted)">${fmtDate(o.createdAt)}</small>
-    ${timeline}${courier}
+    ${timeline}${o.status==='Pending' ? bankCardHtml(o.pay) : ''}${courier}
     <h4 style="margin:12px 0 4px">অর্ডার সামারি</h4>
     ${items}
     ${o.deliveryCharge?`<div class="cartrow"><div>ডেলিভারি চার্জ (${esc(o.deliveryArea||'')})</div><div>৳${Number(o.deliveryCharge)||0}</div></div>`:''}
