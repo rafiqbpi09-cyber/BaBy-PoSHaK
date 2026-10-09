@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoice</title>
+<style>
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#fdf6f0;color:#1f2937;margin:0;padding:20px;}
+  .toolbar{max-width:760px;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;}
+  .toolbar button{background:#1e3a8a;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;}
+  .wrap{max-width:760px;margin:0 auto;background:#fff;border-radius:16px;padding:28px;position:relative;overflow:hidden;}
+  .topwave{position:absolute;bottom:0;left:0;right:0;height:26px;background:linear-gradient(90deg,#ffd6e8,#ffe9c7);border-radius:16px 16px 0 0;opacity:.6;z-index:0;}
+  .inner{position:relative;z-index:1;}
+  .headrow{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;border-bottom:3px solid #2563eb;padding-bottom:14px;margin-bottom:18px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .bear{font-size:46px;}
+  .brand h1{margin:0;font-size:26px;background:linear-gradient(90deg,#ec4899,#2563eb);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .brand small{display:block;color:#6b7280;font-size:12px;}
+  .tagline{font-size:13px;max-width:220px;line-height:1.5;}
+  .features{display:flex;flex-direction:column;gap:6px;font-size:12px;}
+  .features span{display:flex;align-items:center;gap:6px;}
+  .features i{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-style:normal;}
+  .badge-invoice{display:inline-block;background:#1e3a8a;color:#fff;font-weight:800;letter-spacing:1px;padding:8px 22px;border-radius:8px;font-size:18px;margin-bottom:14px;}
+  .toprow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .metabox{font-size:13px;line-height:1.9;}
+  .custbox{background:#eef4ff;border-radius:10px;padding:12px 16px;min-width:260px;font-size:13px;line-height:1.9;}
+  .custbox h4{margin:0 0 6px;color:#1e3a8a;}
+  .tablewrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;}
+  th{background:#2563eb;color:#fff;padding:9px 6px;font-size:12px;}
+  td{padding:9px 6px;border-bottom:1px solid #eef0f3;vertical-align:middle;}
+  .pimg{width:44px;height:44px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:8px;}
+  .totbox{margin-left:auto;width:280px;max-width:100%;}
+  .totbox div{display:flex;justify-content:space-between;padding:7px 12px;font-size:13px;}
+  .totbox .sub{background:#f3f4f6;}
+  .totbox .disc{background:#e7f8ef;color:#0e9f6e;}
+  .totbox .dc{background:#eaf2ff;}
+  .totbox .grand{background:#1e3a8a;color:#fff;font-weight:800;font-size:15px;border-radius:0 0 8px 8px;}
+  .paycards{display:flex;gap:10px;margin:18px 0;flex-wrap:wrap;}
+  .paycards .c{flex:1;min-width:150px;border-radius:10px;padding:10px 14px;font-size:13px;}
+  .pc1{background:#ffe3ec;color:#be185d;}
+  .pc2{background:#e7f8ef;color:#0e9f6e;}
+  .pc3{background:#ffe9e9;color:#c92a2a;}
+  .botgrid{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+  .botbox{flex:1;min-width:220px;background:#f4f6fb;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.9;}
+  .qrbox{width:140px;text-align:center;font-size:11px;color:#6b7280;}
+  .footer{text-align:center;margin-top:10px;}
+  .footer .thanks{font-size:20px;color:#1e3a8a;font-weight:700;}
+  .footer small{color:#6b7280;}
+  .cancelled{background:#ffe9e9;color:#c92a2a;font-weight:700;padding:10px 14px;border-radius:10px;margin-bottom:14px;text-align:center;}
+  @media print{ body{background:#fff;padding:0;} .toolbar{display:none;} .wrap{border-radius:0;} }
+</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">🖨️ প্রিন্ট / PDF সেভ করুন</button></div>
+<div id="root"><p style="text-align:center">মেমো লোড হচ্ছে...</p></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const SHOP_NAME = "Baby Poshak";
+const SHOP_TAGLINE = "ছোটদের জন্য সুন্দর পোশাক, সুস্থ ও আনন্দময় শৈশবের জন্য...";
+const SHOP_PHONE = "8801712863183";
+const SHOP_FACEBOOK = "https://www.facebook.com/share/1Fc8pUEEfF/";
+
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function safeUrl(u){ return /^https?:\/\//i.test(u||'') ? u : ''; }
+function fmtDate(ts){
+  const d = ts && ts.toDate ? ts.toDate() : null;
+  if(!d) return '';
+  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+}
+function emojiFor(n){ const t=(n||'').toLowerCase(); if(/frock|dress|gown/.test(t)) return '👗'; if(/pant|trouser|jogger/.test(t)) return '👖'; if(/cap|hat/.test(t)) return '🧢'; if(/shoe|sock/.test(t)) return '🧦'; return '👕'; }
+const root = document.getElementById('root');
+
+async function main(){
+  const id = new URLSearchParams(location.search).get('id') || '';
+  if(!/^BP-[A-Z0-9]{8}$/.test(id)){ root.innerHTML = '<p style="text-align:center">লিংকটি সঠিক নয়।</p>'; return; }
+  let o;
+  try{ const d = await db.collection('orders').doc(id).get(); if(!d.exists) throw 0; o = d.data(); }
+  catch(e){ root.innerHTML = '<p style="text-align:center">মেমোটি পাওয়া যায়নি।</p>'; return; }
+
+  const items = await Promise.all((o.items||[]).map(async i=>{
+    let extra = {size:'', color:'', imageUrl:''};
+    try{
+      const pd = await db.collection('products').doc(i.id).get();
+      if(pd.exists){ const p = pd.data(); extra = { size:[p.ageGroup, p.size?('Size '+p.size):''].filter(Boolean).join(' · '), color:p.color||'', imageUrl:p.imageUrl||'' }; }
+    }catch(e){}
+    return {...i, ...extra};
+  }));
+
+  const subtotal = items.reduce((s,i)=>s+(Number(i.price)||0)*(Number(i.qty)||0),0);
+  const delivery = Number(o.deliveryCharge)||0;
+  const grand = Number(o.total)||0;
+  const discount = Math.max(0, subtotal + delivery - grand);
+  const isCOD = o.pay === 'Cash on Delivery';
+  const paid = (o.status==='Delivered' || (!isCOD && o.status!=='Pending')) ? grand : 0;
+  const due = grand - paid;
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=' + encodeURIComponent(SHOP_FACEBOOK);
+
+  const rows = items.map((i,idx)=>{
+    const img = safeUrl(i.imageUrl) ? `<img class="pimg" src="${esc(i.imageUrl)}" alt="">` : `<span style="font-size:22px;margin-right:6px">${emojiFor(i.name)}</span>`;
+    const qty = Number(i.qty)||0, price = Number(i.price)||0;
+    return `<tr>
+      <td style="text-align:center">${String(idx+1).padStart(2,'0')}</td>
+      <td>${img}<b>${esc(i.name)}</b></td>
+      <td style="text-align:center">${esc(i.size||'-')}</td>
+      <td style="text-align:center">${i.color?`<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${esc(i.color)};vertical-align:middle;margin-right:4px;border:1px solid #0002"></span>${esc(i.color)}`:'-'}</td>
+      <td style="text-align:center">${qty}</td>
+      <td style="text-align:right">৳${price}</td>
+      <td style="text-align:right;font-weight:700">৳${(price*qty).toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  document.title = 'Invoice ' + id;
+  root.innerHTML = `<div class="wrap"><div class="inner">
+    <div class="headrow">
+      <div class="brand"><div class="bear">🧸</div><div><h1>${esc(SHOP_NAME)}</h1><small>Baby &amp; Kids Clothing Store</small></div></div>
+      <div class="tagline">${esc(SHOP_TAGLINE)} 💕</div>
+      <div class="features">
+        <span><i style="background:#2563eb">👕</i> Baby Clothes</span>
+        <span><i style="background:#ec4899">😊</i> Kids Fashion</span>
+        <span><i style="background:#16a34a">✔</i> Quality Products</span>
+        <span><i style="background:#0ea5e9">🚚</i> Fast Delivery</span>
+      </div>
+    </div>
+    <div class="badge-invoice">INVOICE</div>
+    ${o.status==='Cancelled' ? '<div class="cancelled">এই অর্ডারটি বাতিল করা হয়েছে</div>' : ''}
+    <div class="toprow">
+      <div class="metabox">
+        <b>Invoice No</b> : ${esc(id)}<br>
+        <b>Date</b> : ${esc(fmtDate(o.createdAt))}<br>
+        <b>Order Status</b> : ${esc(o.status||'')}
+      </div>
+      <div class="custbox">
+        <h4>👤 Customer Information</h4>
+        <b>Name</b> : ${esc(o.name||'-')}<br>
+        <b>Mobile</b> : ${esc(o.phone||'-')}<br>
+        <b>Address</b> : ${esc(o.addr||'-')}
+      </div>
+    </div>
+    <div class="tablewrap"><table>
+      <tr><th>SL</th><th>Product</th><th>Size</th><th>Color</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+      ${rows}
+    </table></div>
+    <div class="totbox">
+      <div class="sub"><span>Subtotal</span><span>৳${subtotal.toFixed(2)}</span></div>
+      ${discount?`<div class="disc"><span>Discount</span><span>−৳${discount.toFixed(2)}</span></div>`:''}
+      ${delivery?`<div class="dc"><span>Delivery Charge</span><span>৳${delivery.toFixed(2)}</span></div>`:''}
+      <div class="grand"><span>Grand Total</span><span>৳${grand.toFixed(2)}</span></div>
+    </div>
+    <div class="paycards">
+      <div class="c pc1"><b>Payment Method</b><br>${esc(o.pay||'-')}</div>
+      <div class="c pc2"><b>Paid</b><br>৳${paid.toFixed(2)}</div>
+      <div class="c pc3"><b>Due</b><br>৳${due.toFixed(2)}</div>
+    </div>
+    <div class="botgrid">
+      <div class="botbox">
+        <b>🚚 Delivery Information</b><br>
+        Courier : ${esc(o.courier||'-')}<br>
+        Delivery Area : ${esc(o.deliveryArea||o.addr||'-')}<br>
+        Tracking ID : ${esc(o.trackingId||'-')}
+        ${o.estDelivery?`<br>Est. Delivery : ${esc(o.estDelivery)}`:''}
+      </div>
+      <div class="botbox">
+        <b>📞 Contact Us</b><br>
+        Facebook : ${esc(SHOP_NAME)}<br>
+        Phone : ${esc(SHOP_PHONE)}
+      </div>
+      <div class="qrbox"><img src="${qrUrl}" width="100" height="100" alt="QR"><div>Scan for Facebook</div></div>
+    </div>
+    <div class="footer">
+      <div class="thanks">Thank you for shopping with us! 💙</div>
+      <small>Please keep this invoice for exchange/warranty purposes.</small>
+    </div>
+  </div><div class="topwave"></div></div>`;
+}
+main();
+</script>
+</body>
+</html>

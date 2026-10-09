@@ -230,6 +230,13 @@ function showPendingOrdersSheet(){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><h2>🔔 নতুন অর্ডার (${pending.length})</h2>
     ${rows || '<p class="note">এখন কোনো নতুন/পেন্ডিং অর্ডার নেই।</p>'}`, true);
 }
+function invoiceUrl(id){ return new URL('invoice.html?id='+encodeURIComponent(id), location.href).href; }
+function openOrderInvoice(id){ window.open(invoiceUrl(id), '_blank'); }
+function shareOrderInvoice(id){
+  const o = orders.find(x=>x.id===id); if(!o) return;
+  const text = `Baby Poshak: আপনার অর্ডার ${o.id} এর মেমো/ইনভয়েস\nমোট: ৳${Number(o.total)||0}\nদেখতে বা ডাউনলোড করতে লিংকে ক্লিক করুন: ${invoiceUrl(o.id)}`;
+  window.open('https://wa.me/'+intlPhone(o.phone)+'?text='+encodeURIComponent(text));
+}
 function showNewOrderPopup(o){
   const m = document.createElement('div');
   m.className = 'newordermodal';
@@ -238,6 +245,7 @@ function showNewOrderPopup(o){
       <h2 style="margin:6px 0">নতুন অর্ডার এসেছে!</h2>
       <p style="font-size:15px"><b>${esc(o.name)}</b><br>${esc(o.phone)}<br>৳${Number(o.total)||0} · ${(o.items||[]).length}টি আইটেম</p>
       <button class="primary" style="width:100%;margin-bottom:8px" onclick="this.closest('.newordermodal').remove();adminTab='orders';renderAdmin();editOrder('${esc(o.id)}')">বিস্তারিত দেখুন</button>
+      <button class="secondary" style="width:100%;margin-bottom:8px" onclick="openOrderInvoice('${esc(o.id)}')">🧾 Memo দেখুন</button>
       <button class="secondary" style="width:100%" onclick="this.closest('.newordermodal').remove()">বন্ধ করুন</button>
     </div>`;
   document.body.appendChild(m);
@@ -264,6 +272,7 @@ auth.onAuthStateChanged(u=>{
       orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
       updateNotifBadge();
       if(isAdmin && (adminTab==='orders'||adminTab==='analytics')) renderAdminBody();
+      if(isAdmin && adminTab==='memo' && memoSubTab==='online') fillMemoList();
     });
   }
   if(!u && unsubOrders){ unsubOrders(); unsubOrders = null; orders = []; updateNotifBadge(); }
@@ -500,7 +509,9 @@ function editOrder(id){
     <label>বর্তমান অবস্থা / লোকেশন (যেমন: ঢাকা হাবে পৌঁছেছে)</label><input id="oNote" value="${esc(o.trackingNote||'')}">
     <label>সম্ভাব্য ডেলিভারি তারিখ</label><input id="oEta" type="date" value="${esc(o.estDelivery||'')}">
     <button class="primary" style="width:100%;margin-bottom:8px" onclick="saveOrder('${esc(o.id)}')">সেভ করুন</button>
-    <button class="secondary" style="width:100%" onclick="whatsappCustomer('${esc(o.id)}')">📲 কাস্টমারকে WhatsApp এ জানান</button>`);
+    <button class="secondary" style="width:100%;margin-bottom:8px" onclick="whatsappCustomer('${esc(o.id)}')">📲 কাস্টমারকে WhatsApp এ জানান</button>
+    <button class="secondary" style="width:100%;margin-bottom:8px" onclick="openOrderInvoice('${esc(o.id)}')">🧾 Memo / Invoice দেখুন</button>
+    <button class="secondary" style="width:100%" onclick="shareOrderInvoice('${esc(o.id)}')">📤 Memo কাস্টমারকে WhatsApp এ শেয়ার করুন</button>`);
 }
 async function saveOrder(id){
   const o = orders.find(x=>x.id===id); if(!o) return;
@@ -545,6 +556,7 @@ function renderMemoTab(body){
       <button class="${memoSubTab==='create'?'active':''}" onclick="setMemoSubTab('create')">🧾 Create Memo</button>
       <button class="${memoSubTab==='drafts'?'active':''}" onclick="setMemoSubTab('drafts')">🟡 Saved/Draft Memos</button>
       <button class="${memoSubTab==='history'?'active':''}" onclick="setMemoSubTab('history')">📜 Memo History</button>
+      <button class="${memoSubTab==='online'?'active':''}" onclick="setMemoSubTab('online')">🛒 অনলাইন অর্ডার মেমো</button>
     </div>
     <div id="memoBody"></div>`;
   renderMemoBody();
@@ -555,16 +567,31 @@ function renderMemoBody(){
   if(memoSubTab==='create'){
     renderMemoCreate(el);
   } else {
-    const list = memos.filter(m=> memoSubTab==='drafts' ? m.status==='draft' : m.status==='final');
     el.innerHTML = `
       <input id="memoSearchBox" placeholder="🔎 Memo নম্বর বা কাস্টমারের নাম দিয়ে খুঁজুন" value="${esc(memoSearch)}" oninput="setMemoSearch(this.value)">
+      ${memoSubTab==='online' ? '<p class="note" style="margin:0 0 10px">কাস্টমার অর্ডার করার সাথে সাথেই এই মেমো অটো তৈরি হয়ে যায়। Memo নম্বর = অর্ডার ID।</p>' : ''}
       <div id="memoListBox"></div>`;
-    document.getElementById('memoListBox').innerHTML = renderMemoList(list);
+    fillMemoList();
   }
 }
-function setMemoSearch(v){ memoSearch=v; const box=document.getElementById('memoListBox'); if(!box) return;
+function fillMemoList(){
+  const box = document.getElementById('memoListBox'); if(!box) return;
+  if(memoSubTab==='online'){ box.innerHTML = renderOnlineMemoList(); return; }
   const list = memos.filter(m=> memoSubTab==='drafts' ? m.status==='draft' : m.status==='final');
   box.innerHTML = renderMemoList(list);
+}
+function setMemoSearch(v){ memoSearch=v; fillMemoList(); }
+function renderOnlineMemoList(){
+  const q = memoSearch.trim().toLowerCase();
+  const list = orders.slice().sort((a,b)=>orderMs(b)-orderMs(a)).filter(o=>!q || (o.id||'').toLowerCase().includes(q) || (o.name||'').toLowerCase().includes(q) || (o.phone||'').includes(q));
+  if(!list.length) return '<p class="note">কোনো অনলাইন অর্ডার মেমো পাওয়া যায়নি।</p>';
+  return list.map(o=>`<div class="ordercard" style="cursor:default">
+      <b>${esc(o.id)}</b> <span class="stbadge ${o.status==='Cancelled'?'Cancelled':''}">${esc(STATUS_LABEL[o.status]||o.status)}</span><br>
+      <small>${esc(o.name)} · ${esc(o.phone)} · ৳${Number(o.total)||0} · ${fmtDate(o.createdAt)}</small>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="smallbtn edit" onclick="openOrderInvoice('${esc(o.id)}')">🧾 Memo দেখুন</button>
+        <button class="smallbtn edit" onclick="shareOrderInvoice('${esc(o.id)}')">📤 কাস্টমারকে শেয়ার</button>
+      </div></div>`).join('');
 }
 function renderMemoList(list){
   const q = memoSearch.trim().toLowerCase();

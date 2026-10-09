@@ -50,7 +50,7 @@ service cloud.firestore {
 
 ## ধাপ ৩: GitHub এ আপলোড ও Pages এ হোস্ট করা
 1. GitHub এ নতুন একটা repository বানান (যেমন `baby-poshak`)।
-2. `index.html` (কাস্টমার পেজ), `admin.html` (শুধু আপনার জন্য Admin পেজ) এবং `firebase-config.js` — এই তিনটা ফাইল রিপোতে আপলোড করুন।
+2. `index.html` (কাস্টমার পেজ), `admin.html` (শুধু আপনার জন্য Admin পেজ), `invoice.html` (অর্ডারের মেমো/ইনভয়েস পেজ) এবং `firebase-config.js` — এই চারটা ফাইল রিপোতে আপলোড করুন।
    - কাস্টমার লিংক: `https://yourusername.github.io/baby-poshak/`
    - Admin লিংক: `https://yourusername.github.io/baby-poshak/admin.html` (এই লিংক কাস্টমারদের দেবেন না, শুধু নিজে বুকমার্ক করে রাখুন)
 3. Repo → **Settings → Pages** → Source: **Deploy from a branch** → branch: `main`, folder: `/root` → **Save**।

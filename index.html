@@ -176,7 +176,7 @@ const db = firebase.firestore();
 // ⚠️ এখানে আপনার বিজনেসের আসল ফোন/হোয়াটসঅ্যাপ নম্বর বসান (দেশের কোড সহ, + ছাড়া)
 const BUSINESS_PHONE = "8801712863183";
 // ⚠️ ডেলিভারি চার্জ — প্রয়োজনমতো বদলে নিন
-const DELIVERY_CHARGES = { 'ঢাকার ভিতরে': 90, 'ঢাকার বাইরে': 140 };
+const DELIVERY_CHARGES = { 'ঢাকার ভিতরে': 70, 'ঢাকার বাইরে': 130 };
 let offerPriceOverride = {};
 function priceFor(id){
   const p = products.find(x=>x.id===id);
@@ -669,6 +669,7 @@ async function openOrder(id){
     ${o.deliveryCharge?`<div class="cartrow"><div>ডেলিভারি চার্জ (${esc(o.deliveryArea||'')})</div><div>৳${Number(o.deliveryCharge)||0}</div></div>`:''}
     <div class="total">মোট: ৳${Number(o.total)||0} <small style="font-weight:400;color:var(--muted)">(${esc(o.pay)})</small></div>
     <p style="font-size:13px;line-height:1.6">👤 ${esc(o.name)} · ${esc(o.phone)}<br>📍 ${esc(o.addr)}</p>
+    <a class="primary" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="invoice.html?id=${encodeURIComponent(id)}" target="_blank">🧾 মেমো / ইনভয়েস দেখুন</a>
     <button class="secondary" style="width:100%;margin-bottom:8px" onclick="openOrder('${esc(id)}')">🔄 রিফ্রেশ</button>
     <a class="secondary" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="https://wa.me/${BUSINESS_PHONE}?text=${encodeURIComponent('অর্ডার '+id+' নিয়ে জানতে চাই')}" target="_blank">💬 সাহায্য দরকার? WhatsApp</a>
     <button class="secondary" style="width:100%" onclick="openMyOrders()">← আমার অর্ডার</button>`);
