@@ -157,6 +157,7 @@ th{background:#ffe3ec;color:var(--pink-dark);text-transform:uppercase;font-size:
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
+try{ localStorage.setItem('bp_no_track','1'); }catch(e){}
 const SHOP_NAME = "Baby Poshak";
 const SHOP_TAGLINE = "ছোটদের জন্য সুন্দর পোশাক, সুস্থ ও আনন্দময় শৈশবের জন্য...";
 const SHOP_PHONE = "8801712863183";
@@ -352,6 +353,7 @@ function renderAdmin(){
       <button class="${adminTab==='analytics'?'active':''}" onclick="setAdminTab('analytics')">📊 রিপোর্ট</button>
       <button class="${adminTab==='memo'?'active':''}" onclick="setAdminTab('memo')">🧾 Memo</button>
       <button class="${adminTab==='offers'?'active':''}" onclick="setAdminTab('offers')">🎁 অফার</button>
+      <button class="${adminTab==='visitors'?'active':''}" onclick="setAdminTab('visitors')">👥 ভিজিটর</button>
     </div>
     <div id="adminBody"></div>`;
   renderAdminBody();
@@ -384,6 +386,8 @@ function renderAdminBody(){
     renderMemoTab(body);
   } else if(adminTab==='offers'){
     renderOffersTab(body);
+  } else if(adminTab==='visitors'){
+    renderVisitorsTab(body);
   }
 }
 function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
@@ -861,6 +865,103 @@ function printMemo(id){
   </body></html>`);
   w.document.close();
 }
+// ---------- VISITORS ----------
+let visits = [];
+let visitsLoaded = false;
+async function loadVisits(){
+  try{
+    const snap = await db.collection('visits').orderBy('at','desc').limit(1500).get();
+    visits = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    visitsLoaded = true;
+  }catch(e){
+    console.error(e);
+    const b = document.getElementById('adminBody');
+    if(b && adminTab==='visitors') b.innerHTML = '<p class="note">ভিজিটর ডেটা লোড করা যায়নি। Firestore Rules-এ visits অংশ যোগ করে Publish করা আছে কিনা দেখুন।</p>';
+    return;
+  }
+  if(isAdmin && adminTab==='visitors') renderAdminBody();
+}
+function refreshVisits(){ visitsLoaded = false; renderAdminBody(); }
+function vMs(x){ return x.at && x.at.toMillis ? x.at.toMillis() : 0; }
+function fmtDT(ms){ return ms && isFinite(ms) ? new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '-'; }
+function renderVisitorsTab(body){
+  if(!visitsLoaded){ body.innerHTML = '<p class="note">ভিজিটর ডেটা লোড হচ্ছে...</p>'; loadVisits(); return; }
+  const pure = visits.filter(x=>x.type!=='order');
+  const today0 = startOfToday(), DAY = 86400000;
+  const uniq = arr => new Set(arr.map(x=>x.vid)).size;
+  const todayV = pure.filter(x=>vMs(x)>=today0);
+  const weekV = pure.filter(x=>vMs(x)>=today0-6*DAY);
+
+  const people = {};
+  visits.forEach(x=>{
+    const p = people[x.vid] || (people[x.vid] = {vid:x.vid, count:0, first:Infinity, last:0, device:x.device||'', ref:'', name:'', phone:''});
+    if(x.type==='order'){ p.name = p.name || x.name || ''; p.phone = p.phone || x.phone || ''; return; }
+    p.count++;
+    const t = vMs(x);
+    if(t && t<p.first){ p.first = t; p.ref = x.ref || p.ref; }
+    if(t>p.last){ p.last = t; p.device = x.device || p.device; }
+  });
+  const peopleList = Object.values(people).filter(p=>p.count>0).sort((a,b)=>b.last-a.last).slice(0,100);
+
+  const refs = {};
+  pure.forEach(x=>{ const r = x.ref || 'Direct'; const o = refs[r] || (refs[r] = {n:0, ids:new Set()}); o.n++; o.ids.add(x.vid); });
+  const refRows = Object.entries(refs).sort((a,b)=>b[1].n-a[1].n);
+
+  const dayRows = [];
+  for(let i=0;i<14;i++){
+    const s = today0 - i*DAY;
+    const dv = pure.filter(x=>vMs(x)>=s && vMs(x)<s+DAY);
+    dayRows.push(`<tr><td>${new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</td><td>${dv.length}</td><td>${uniq(dv)}</td></tr>`);
+  }
+
+  body.innerHTML = `
+    <p class="note" style="margin:0 0 10px">কাস্টমারদের লগইন লাগে না, তাই এখানে সাইটে কে কতবার ঢুকেছে (ভিজিট) দেখানো হচ্ছে। একই ফোন/ব্রাউজার = একজন ভিজিটর। কেউ অর্ডার করলে তার নাম ও নম্বর এখানে দেখা যাবে।</p>
+    <div class="statgrid">
+      <div class="stat"><div class="statnum">${pure.length}</div><div class="statlabel">মোট ভিজিট</div></div>
+      <div class="stat"><div class="statnum">${uniq(pure)}</div><div class="statlabel">আলাদা ভিজিটর</div></div>
+      <div class="stat"><div class="statnum">${todayV.length}</div><div class="statlabel">আজকের ভিজিট</div></div>
+      <div class="stat"><div class="statnum">${uniq(todayV)}</div><div class="statlabel">আজকের ভিজিটর</div></div>
+      <div class="stat"><div class="statnum">${weekV.length}</div><div class="statlabel">শেষ ৭ দিনের ভিজিট</div></div>
+    </div>
+    <button class="secondary" style="margin-bottom:14px" onclick="refreshVisits()">🔄 রিফ্রেশ</button>
+    ${visits.length>=1500 ? '<p class="note">সর্বশেষ ১৫০০টি রেকর্ড দেখানো হচ্ছে।</p>' : ''}
+
+    <h3>🔗 কাকে লিংক দিলেন? আলাদা লিংক বানান</h3>
+    <p class="note" style="margin:0 0 8px">প্রতিজনের নামে একটা করে লিংক বানিয়ে তাকে দিন। তাহলে নিচের "উৎস" তালিকায় দেখা যাবে কোন লিংক থেকে কতজন কতবার ঢুকেছে।</p>
+    <input id="trkName" placeholder="যার জন্য লিংক, যেমন: Rahim">
+    <button class="primary" style="margin-bottom:10px" onclick="makeTrackLink()">লিংক বানান</button>
+    <div id="trkLinkOut"></div>
+
+    <h3>উৎস অনুযায়ী (কোন লিংক/জায়গা থেকে এসেছে)</h3>
+    <div class="overflow-x"><table><tr><th>উৎস</th><th>ভিজিট</th><th>আলাদা ভিজিটর</th></tr>
+      ${refRows.map(([r,o])=>`<tr><td>${esc(r)}</td><td>${o.n}</td><td>${o.ids.size}</td></tr>`).join('') || '<tr><td colspan="3">এখনো কোনো ভিজিট নেই</td></tr>'}
+    </table></div>
+
+    <h3 style="margin-top:18px">ভিজিটর তালিকা (সর্বশেষ ১০০ জন)</h3>
+    <div class="overflow-x"><table><tr><th>ভিজিটর</th><th>উৎস</th><th>ডিভাইস</th><th>ভিজিট</th><th>প্রথম</th><th>শেষ</th></tr>
+      ${peopleList.map(p=>`<tr>
+        <td>${p.name ? `<b>${esc(p.name)}</b><br><small>${esc(p.phone)}</small>` : `Visitor #${esc(p.vid.slice(-4))}`}</td>
+        <td>${esc(p.ref||'-')}</td><td>${esc(p.device||'-')}</td><td><b>${p.count}</b></td>
+        <td><small>${fmtDT(p.first)}</small></td><td><small>${fmtDT(p.last)}</small></td></tr>`).join('') || '<tr><td colspan="6">এখনো কোনো ভিজিটর নেই</td></tr>'}
+    </table></div>
+
+    <h3 style="margin-top:18px">দিন অনুযায়ী (শেষ ১৪ দিন)</h3>
+    <div class="overflow-x"><table><tr><th>তারিখ</th><th>ভিজিট</th><th>আলাদা ভিজিটর</th></tr>${dayRows.join('')}</table></div>
+    <p class="note">যে ডিভাইসে আপনি Admin পেজ খুলেছেন সেই ডিভাইসের ভিজিট গোনা হয় না, যাতে আপনার নিজের ঢোকা হিসাবে না আসে।</p>`;
+}
+function makeTrackLink(){
+  const n = document.getElementById('trkName').value.trim();
+  if(!n){ alert('যার জন্য লিংক, তার নাম লিখুন'); return; }
+  const url = new URL('./?ref='+encodeURIComponent(n), location.href).href;
+  document.getElementById('trkLinkOut').innerHTML = `<input id="trkLinkVal" readonly value="${esc(url)}">
+    <button class="secondary" style="margin-bottom:10px" onclick="copyTrackLink()">📋 লিংক কপি করুন</button>`;
+}
+function copyTrackLink(){
+  const v = document.getElementById('trkLinkVal').value;
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(v).then(()=>alert('লিংক কপি হয়েছে'), ()=>alert(v)); }
+  else alert(v);
+}
+
 // ---------- OFFERS ----------
 function renderOffersTab(body){
   body.innerHTML = `<button class="primary" style="margin-bottom:12px" onclick="editOffer(null)">+ নতুন অফার</button>

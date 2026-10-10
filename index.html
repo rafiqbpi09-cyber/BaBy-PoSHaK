@@ -610,6 +610,7 @@ async function placeOrder(){
     await db.collection('orders').doc(orderId).set({ name, phone, addr, pay, items, deliveryArea, deliveryCharge, total, status:'Pending', history:[{status:'Pending', at:Date.now()}], createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   }catch(e){ console.error(e); alert('অর্ডার পাঠানো যায়নি, আবার চেষ্টা করুন'); return; }
   rememberOrder(orderId);
+  trackOrderIdentity(name, phone);
   for(const it of items){
     try{ await db.collection('products').doc(it.id).update({ stock: firebase.firestore.FieldValue.increment(-it.qty), sold: firebase.firestore.FieldValue.increment(it.qty) }); }
     catch(e){ console.warn('stock update failed', e); }
@@ -734,6 +735,33 @@ function showSheet(html){
 }
 function closeSheet(){ const ov=document.getElementById('sheetOverlay'); if(ov) ov.remove(); }
 
+// ---------- VISIT TRACKING ----------
+function getVisitorId(){
+  let v = localStorage.getItem('bp_vid');
+  if(!v){ const a = new Uint32Array(3); crypto.getRandomValues(a); v = 'v' + Array.from(a, n=>n.toString(36)).join('').slice(0,14); localStorage.setItem('bp_vid', v); }
+  return v;
+}
+function getDeviceType(){
+  const ua = navigator.userAgent || '';
+  return /iPad|Tablet/i.test(ua) ? 'Tablet' : (/Mobi|Android|iPhone/i.test(ua) ? 'Mobile' : 'Desktop');
+}
+function trackVisit(){
+  try{
+    if(localStorage.getItem('bp_no_track')) return;
+    if(sessionStorage.getItem('bp_visit_logged')) return;
+    sessionStorage.setItem('bp_visit_logged','1');
+    let ref = (new URLSearchParams(location.search).get('ref')||'').trim().slice(0,60);
+    if(!ref){ try{ ref = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./,'') : 'Direct'; }catch(e){ ref = 'Direct'; } }
+    db.collection('visits').add({ vid:getVisitorId(), at:firebase.firestore.FieldValue.serverTimestamp(), device:getDeviceType(), ref }).catch(()=>{});
+  }catch(e){}
+}
+function trackOrderIdentity(name, phone){
+  try{
+    if(localStorage.getItem('bp_no_track')) return;
+    db.collection('visits').add({ vid:getVisitorId(), at:firebase.firestore.FieldValue.serverTimestamp(), device:getDeviceType(), type:'order', name:String(name).slice(0,100), phone:String(phone).slice(0,20) }).catch(()=>{});
+  }catch(e){}
+}
+trackVisit();
 document.getElementById('waFab').href = 'https://wa.me/'+BUSINESS_PHONE;
 showView('store');
 </script>

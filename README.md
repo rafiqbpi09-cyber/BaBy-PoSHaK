@@ -49,6 +49,18 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null;
     }
+
+    match /visits/{doc} {
+      allow create: if request.resource.data.keys().hasOnly(['vid','at','device','ref','type','name','phone'])
+        && request.resource.data.vid is string && request.resource.data.vid.size() <= 30
+        && request.resource.data.at == request.time
+        && request.resource.data.device in ['Mobile','Desktop','Tablet']
+        && (!('ref' in request.resource.data) || (request.resource.data.ref is string && request.resource.data.ref.size() <= 60))
+        && (!('type' in request.resource.data) || request.resource.data.type == 'order')
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 100))
+        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 20));
+      allow read, update, delete: if request.auth != null;
+    }
   }
 }
 ```
