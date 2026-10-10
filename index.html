@@ -676,6 +676,14 @@ async function trackByForm(){
     rememberOrder(id); openOrder(id);
   }catch(e){ alert('অর্ডারটি পাওয়া যায়নি।'); }
 }
+async function confirmReceived(id){
+  if(!confirm('আপনি কি নিশ্চিত যে প্রোডাক্ট হাতে পেয়েছেন?')) return;
+  try{
+    await db.collection('orders').doc(id).update({ customerConfirmed: true, customerConfirmedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    alert('ধন্যবাদ! আপনার রিসিভ নিশ্চিত হয়েছে।');
+  }catch(e){ console.error(e); alert('নিশ্চিত করা যায়নি, একটু পরে আবার চেষ্টা করুন বা WhatsApp এ জানান।'); }
+  openOrder(id);
+}
 async function openOrder(id){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button><p>লোড হচ্ছে...</p>`);
   let o;
@@ -700,6 +708,13 @@ async function openOrder(id){
     <h2 style="margin-bottom:2px">${esc(id)}</h2>
     <small style="color:var(--muted)">${fmtDate(o.createdAt)}</small>
     ${timeline}${o.status==='Pending' ? bankCardHtml(o.pay) : ''}${courier}
+    ${o.customerConfirmed
+      ? `<div class="courierbox" style="background:#e7f8ef;border-color:#bfe8d1;color:#0e9f6e;font-weight:700">✅ আপনি প্রোডাক্ট রিসিভ নিশ্চিত করেছেন — ধন্যবাদ!</div>`
+      : ((o.status==='Shipped'||o.status==='Delivered')
+        ? `<div class="courierbox"><b>📦 প্রোডাক্ট কি হাতে পেয়েছেন?</b><br>
+            <button class="primary" style="width:100%;margin-top:8px" onclick="confirmReceived('${esc(id)}')">✅ হ্যাঁ, আমি প্রোডাক্ট পেয়েছি</button>
+            <a class="secondary" style="display:block;text-align:center;text-decoration:none;margin-top:8px;padding:9px" href="https://wa.me/${BUSINESS_PHONE}?text=${encodeURIComponent('অর্ডার '+id+' নিয়ে সমস্যা আছে')}" target="_blank">⚠️ সমস্যা আছে? WhatsApp এ জানান</a>
+          </div>` : '')}
     <h4 style="margin:12px 0 4px">অর্ডার সামারি</h4>
     ${items}
     ${o.deliveryCharge?`<div class="cartrow"><div>ডেলিভারি চার্জ (${esc(o.deliveryArea||'')})</div><div>৳${Number(o.deliveryCharge)||0}</div></div>`:''}

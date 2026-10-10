@@ -25,7 +25,13 @@ service cloud.firestore {
     }
     match /orders/{doc} {
       allow get: if true;
-      allow list, update, delete: if request.auth != null;
+      allow list, delete: if request.auth != null;
+      allow update: if request.auth != null
+        || (resource.data.status in ['Shipped','Delivered']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerConfirmed','customerConfirmedAt'])
+            && request.resource.data.customerConfirmed == true
+            && request.resource.data.customerConfirmedAt == request.time
+            && !('customerConfirmed' in resource.data));
       allow create: if doc.matches('BP-[A-Z0-9]{8}')
         && request.resource.data.keys().hasOnly(['name','phone','addr','pay','items','deliveryArea','deliveryCharge','total','status','history','createdAt'])
         && request.resource.data.status == 'Pending'

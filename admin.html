@@ -237,6 +237,27 @@ function shareOrderInvoice(id){
   const text = `Baby Poshak: আপনার অর্ডার ${o.id} এর মেমো/ইনভয়েস\nমোট: ৳${Number(o.total)||0}\nদেখতে বা ডাউনলোড করতে লিংকে ক্লিক করুন: ${invoiceUrl(o.id)}`;
   window.open('https://wa.me/'+intlPhone(o.phone)+'?text='+encodeURIComponent(text));
 }
+function receiptBadge(o){
+  if(o.customerConfirmed) return '<br><small style="color:#0e9f6e;font-weight:700">✅ কাস্টমার রিসিভ করেছেন</small>';
+  if(o.status==='Shipped' || o.status==='Delivered') return '<br><small style="color:#b45309">⏳ রিসিভ নিশ্চিত হয়নি</small>';
+  return '';
+}
+function notifyReceived(o){
+  beep();
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification('✅ কাস্টমার প্রোডাক্ট রিসিভ করেছেন', { body: `${o.name} — ${o.id}`, tag: 'rcv-'+o.id }); }catch(e){}
+  }
+  const m = document.createElement('div');
+  m.className = 'newordermodal';
+  m.innerHTML = `<div class="newordercard">
+      <div style="font-size:40px">✅</div>
+      <h2 style="margin:6px 0">প্রোডাক্ট রিসিভ হয়েছে!</h2>
+      <p style="font-size:15px"><b>${esc(o.name)}</b><br>${esc(o.phone)}<br><small>${esc(o.id)} · ৳${Number(o.total)||0}</small></p>
+      <button class="primary" style="width:100%;margin-bottom:8px" onclick="this.closest('.newordermodal').remove();adminTab='orders';renderAdmin();editOrder('${esc(o.id)}')">অর্ডার দেখুন (Delivered করুন)</button>
+      <button class="secondary" style="width:100%" onclick="this.closest('.newordermodal').remove()">বন্ধ করুন</button>
+    </div>`;
+  document.body.appendChild(m);
+}
 function showNewOrderPopup(o){
   const m = document.createElement('div');
   m.className = 'newordermodal';
@@ -266,7 +287,14 @@ auth.onAuthStateChanged(u=>{
     firstOrderLoad = true;
     unsubOrders = db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap=>{
       if(!firstOrderLoad){
-        snap.docChanges().forEach(ch=>{ if(ch.type==='added') notifyNewOrder({id:ch.doc.id, ...ch.doc.data()}); });
+        snap.docChanges().forEach(ch=>{
+          if(ch.type==='added') notifyNewOrder({id:ch.doc.id, ...ch.doc.data()});
+          if(ch.type==='modified'){
+            const nd = {id:ch.doc.id, ...ch.doc.data()};
+            const old = orders.find(x=>x.id===nd.id);
+            if(nd.customerConfirmed && old && !old.customerConfirmed) notifyReceived(nd);
+          }
+        });
       }
       firstOrderLoad = false;
       orders = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -347,7 +375,7 @@ function renderAdminBody(){
     body.innerHTML = orders.length ? `<div class="overflow-x"><table><tr><th>অর্ডার ID</th><th>কাস্টমার</th><th>মোট</th><th>স্ট্যাটাস</th><th></th></tr>
     ${orders.map(o=>`<tr><td><small>${esc(o.id)}</small><br><small style="color:var(--muted)">${fmtDate(o.createdAt)}</small></td>
       <td>${esc(o.name)}<br><small>${esc(o.phone)}</small></td><td>৳${Number(o.total)||0}<br><small>${esc(o.pay)}</small></td>
-      <td><select onchange="updateStatus('${esc(o.id)}',this.value)">${STATUSES.map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></td>
+      <td><select onchange="updateStatus('${esc(o.id)}',this.value)">${STATUSES.map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select>${receiptBadge(o)}</td>
       <td><button class="smallbtn edit" onclick="editOrder('${esc(o.id)}')">বিস্তারিত / কুরিয়ার</button></td></tr>`).join('')}
     </table></div>` : '<p>এখনো কোনো অর্ডার নেই।</p>';
   } else if(adminTab==='analytics'){
@@ -499,6 +527,7 @@ function editOrder(id){
   showSheet(`<button class="close" onclick="closeSheet()">✕</button>
     <h2>অর্ডার ${esc(o.id)}</h2>
     <p style="font-size:13px;line-height:1.6"><b>${esc(o.name)}</b> · ${esc(o.phone)}<br>📍 ${esc(o.addr)}<br>💳 ${esc(o.pay)} · মোট ৳${Number(o.total)||0}<br><small>${fmtDate(o.createdAt)}</small></p>
+    ${o.customerConfirmed ? `<p style="background:#e7f8ef;color:#0e9f6e;font-weight:700;padding:8px 12px;border-radius:8px;font-size:13px">✅ কাস্টমার প্রোডাক্ট রিসিভ নিশ্চিত করেছেন (${fmtDate(o.customerConfirmedAt)})</p>` : ((o.status==='Shipped'||o.status==='Delivered') ? `<p style="background:#fff3cd;color:#856404;padding:8px 12px;border-radius:8px;font-size:13px">⏳ কাস্টমার এখনো রিসিভ নিশ্চিত করেননি</p>` : '')}
     <ul class="features-list">${items}</ul>
     <label>স্ট্যাটাস</label>
     <select id="oStatus">${STATUSES.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s} — ${STATUS_LABEL[s]}</option>`).join('')}</select>
